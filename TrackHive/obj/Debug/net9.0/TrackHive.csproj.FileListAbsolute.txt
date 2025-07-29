@@ -27,3 +27,6 @@ C:\Users\Bernard\source\repos\TrackHive\TrackHive\obj\Debug\net9.0\refint\TrackH
 C:\Users\Bernard\source\repos\TrackHive\TrackHive\obj\Debug\net9.0\TrackHive.pdb
 C:\Users\Bernard\source\repos\TrackHive\TrackHive\obj\Debug\net9.0\TrackHive.genruntimeconfig.cache
 C:\Users\Bernard\source\repos\TrackHive\TrackHive\obj\Debug\net9.0\ref\TrackHive.dll
+C:\Users\Bernard\source\repos\TrackHive\TrackHive\obj\Debug\net9.0\TrackHive.RazorAssemblyInfo.cache
+C:\Users\Bernard\source\repos\TrackHive\TrackHive\obj\Debug\net9.0\TrackHive.RazorAssemblyInfo.cs
+C:\Users\Bernard\source\repos\TrackHive\TrackHive\bin\Debug\net9.0\TrackHive.staticwebassets.runtime.json
