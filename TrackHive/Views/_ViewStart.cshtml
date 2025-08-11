@@ -1,3 +1,5 @@
 ﻿@{
-    Layout = "_Layout";
+    // Use app shell when "logged in" (orgId cookie present)
+    var isAuthed = Context?.Request?.Cookies?.ContainsKey("orgId") ?? false;
+    Layout = isAuthed ? "_Layout.App" : "_Layout";
 }

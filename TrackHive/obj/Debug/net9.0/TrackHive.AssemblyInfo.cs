@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TrackHive")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+669057ab60fee49427cb7c94b945ca9a0acbe2b0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1b0af831777f3d7d071255282db3864f43b3c51c")]
 [assembly: System.Reflection.AssemblyProductAttribute("TrackHive")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TrackHive")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
