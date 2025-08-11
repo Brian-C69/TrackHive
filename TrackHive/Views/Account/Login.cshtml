@@ -1,0 +1,80 @@
+﻿@model TrackHive.Models.Auth.LoginViewModel
+@{
+    ViewData["Title"] = "Log in • TrackHive";
+    Layout = "_Layout";
+    var returnUrl = ViewData["ReturnUrl"] as string;
+}
+
+<section class="py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-5">
+                <div class="card shadow-sm">
+                    <div class="card-body p-4">
+                        <div class="text-center mb-4">
+                            <div class="fs-2">🐝</div>
+                            <h1 class="h4 fw-bold mt-2 mb-0">Welcome back</h1>
+                            <div class="text-muted small">Sign in to continue to TrackHive</div>
+                        </div>
+
+                        <form asp-action="Login" asp-controller="Account" method="post">
+                            @Html.AntiForgeryToken()
+                            @if (!string.IsNullOrEmpty(returnUrl))
+                            {
+                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                            }
+
+                            <div style="min-height: 40px;">
+                                @if (ViewData["AuthError"] is string authError)
+                                {
+                                    <span class="text-danger small">@authError</span>
+                                }
+                            </div>
+
+
+
+                            <div class="mb-3">
+                                <label asp-for="Email" class="form-label"></label>
+                                <input asp-for="Email" class="form-control" autocomplete="username" />
+                                <span asp-validation-for="Email" class="text-danger small"></span>
+                            </div>
+
+                            <div class="mb-3">
+                                <label asp-for="Password" class="form-label"></label>
+                                <input asp-for="Password" class="form-control" autocomplete="current-password" />
+                                <span asp-validation-for="Password" class="text-danger small"></span>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div class="form-check">
+                                    <input asp-for="RememberMe" class="form-check-input" />
+                                    <label asp-for="RememberMe" class="form-check-label"></label>
+                                </div>
+                                <a href="#" class="small text-decoration-none">Forgot password?</a>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100">Log In</button>
+                        </form>
+
+                        <hr class="my-4" />
+                        <div class="text-center">
+                            <span class="text-muted small me-1">New here?</span>
+                            <a asp-controller="Account" asp-action="Register" class="small text-decoration-none">
+                                Create an account
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Demo hint (remove later) -->
+                <div class="text-center text-muted small mt-3">
+                    Demo: admin@trackhive.local / Pass@123
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,44 @@
+﻿@model TrackHive.Models.Invites.InviteHrViewModel
+@{
+    ViewData["Title"] = "Invite HR • TrackHive";
+    Layout = "_Layout";
+}
+<section class="py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-7 col-lg-6">
+                <div class="card shadow-sm">
+                    <div class="card-body p-4">
+                        <h1 class="h4 fw-bold mb-4">Invite HR Admin</h1>
+
+                        @if (TempData["InviteSuccess"] is string ok)
+                        {
+                            <div class="alert alert-success mb-3">@ok</div>
+                        }
+
+                        <form asp-action="InviteHr" method="post">
+                            @Html.AntiForgeryToken()
+
+                            <div class="mb-3">
+                                <label asp-for="Name" class="form-label"></label>
+                                <input asp-for="Name" class="form-control" />
+                                <span class="field-error-slot"><span asp-validation-for="Name" class="text-danger small"></span></span>
+                            </div>
+
+                            <div class="mb-3">
+                                <label asp-for="Email" class="form-label"></label>
+                                <input asp-for="Email" class="form-control" />
+                                <span class="field-error-slot"><span asp-validation-for="Email" class="text-danger small"></span></span>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">Send Invite</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

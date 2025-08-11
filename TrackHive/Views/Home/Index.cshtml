@@ -1,10 +1,374 @@
-﻿@*
-    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-*@
-@{
+﻿@{
+    ViewData["Title"] = "TrackHive — Attendance • Leave • Payroll";
+    Layout = "_Layout";
 }
 
-<H1>Home | Index</H1>
-<H1>Home | Index</H1>
-<H1>Home | Index</H1>
-<H1>Home | Index</H1>
+<!-- Hero Section -->
+<section class="bg-light py-5">
+    <div class="container text-center">
+        <h1 class="display-4 fw-bold">TrackHive</h1>
+        <p class="lead mb-4">
+            Smart Attendance, Leave & Payroll — All in One System for HR Teams
+        </p>
+        <a asp-controller="Account" asp-action="Login" class="btn btn-primary btn-lg me-2">Log In</a>
+        <a href="#pricing" class="btn btn-outline-secondary btn-lg">Learn More</a>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section id="features" class="py-5">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold">Key Features</h2>
+            <p class="text-muted">Everything you need to manage employees efficiently.</p>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">Attendance Tracking</h5>
+                        <p class="card-text">Easily record employee check-ins and check-outs in real time.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">Leave Management</h5>
+                        <p class="card-text">Apply, approve, and track leave requests seamlessly.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">Payroll Integration</h5>
+                        <p class="card-text">Automatically calculate salaries based on attendance data.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Call-to-Action -->
+<section class="bg-primary text-white py-5 text-center">
+    <div class="container">
+        <h2 class="fw-bold mb-3">Ready to Simplify Your HR Workflow?</h2>
+        <p class="mb-4">Join TrackHive today and take the hassle out of attendance, leave, and payroll.</p>
+        <a asp-controller="Account" asp-action="Register" class="btn btn-light btn-lg">Get Started</a>
+    </div>
+</section>
+
+<!-- Roles Section -->
+<section id="roles" class="py-5 bg-light">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold">Built for Every Role</h2>
+            <p class="text-muted">Clear permissions. Focused workflows. Less chaos.</p>
+        </div>
+
+        <div class="row g-4">
+            <!-- IT (Super Admin) -->
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">IT (Super Admin)</h5>
+                        <ul class="mb-0 ps-3">
+                            <li>System settings & policies</li>
+                            <li>User & role management</li>
+                            <li>Audit logs & backups</li>
+                            <li>Integrations (SSO, email, payroll)</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-white">
+                        <span class="badge bg-dark">Full Access</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HR (Admin) -->
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">HR (Admin)</h5>
+                        <ul class="mb-0 ps-3">
+                            <li>Employees & departments</li>
+                            <li>Attendance & timesheets</li>
+                            <li>Leave approvals & entitlements</li>
+                            <li>Payroll runs & exports</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-white">
+                        <span class="badge bg-primary">Operational Access</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Employee (User) -->
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">Employee (User)</h5>
+                        <ul class="mb-0 ps-3">
+                            <li>Check-in / Check-out</li>
+                            <li>View timesheet & history</li>
+                            <li>Apply for leave</li>
+                            <li>View payslips & balance</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-white">
+                        <span class="badge bg-success">Self-Service</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tiny CTA under roles -->
+        <div class="text-center mt-5">
+            <a asp-controller="Account" asp-action="Register" class="btn btn-primary btn-lg">
+                🐝 Start with TrackHive
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- How It Works Section -->
+<section id="how" class="py-5">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold">How It Works</h2>
+            <p class="text-muted">Get up and running in three simple steps.</p>
+        </div>
+
+        <div class="row g-4 text-center">
+            <!-- Step 1 -->
+            <div class="col-md-4">
+                <div class="p-4 border rounded-3 h-100 shadow-sm">
+                    <div class="display-4 mb-3">1️⃣</div>
+                    <h5 class="fw-semibold mb-3">Set Up Your Organization</h5>
+                    <p class="text-muted">Add employees, define roles, and configure company policies in minutes.</p>
+                </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="col-md-4">
+                <div class="p-4 border rounded-3 h-100 shadow-sm">
+                    <div class="display-4 mb-3">2️⃣</div>
+                    <h5 class="fw-semibold mb-3">Track Attendance & Leave</h5>
+                    <p class="text-muted">Employees check in/out, request leave, and HR approves — all from one dashboard.</p>
+                </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="col-md-4">
+                <div class="p-4 border rounded-3 h-100 shadow-sm">
+                    <div class="display-4 mb-3">3️⃣</div>
+                    <h5 class="fw-semibold mb-3">Automate Payroll</h5>
+                    <p class="text-muted">Generate accurate payroll with lateness, OT, and deductions calculated automatically.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- CTA under How It Works -->
+        <div class="text-center mt-5">
+            <a asp-controller="Account" asp-action="Register" class="btn btn-primary btn-lg">
+                🐝 Try TrackHive for Free
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- FAQ Section -->
+<section id="faq" class="py-5 bg-light">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold">Frequently Asked Questions</h2>
+            <p class="text-muted">Got a question? We’ve got the answer.</p>
+        </div>
+
+        <div class="accordion" id="faqAccordion">
+            <!-- Q1 -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="faqHeading1">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse1" aria-expanded="true" aria-controls="faqCollapse1">
+                        🐝 What is TrackHive?
+                    </button>
+                </h2>
+                <div id="faqCollapse1" class="accordion-collapse collapse show" aria-labelledby="faqHeading1" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                        TrackHive is an all-in-one HR tool for managing attendance, leave, and payroll in a simple, centralized system.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Q2 -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="faqHeading2">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse2" aria-expanded="false" aria-controls="faqCollapse2">
+                        How much does TrackHive cost?
+                    </button>
+                </h2>
+                <div id="faqCollapse2" class="accordion-collapse collapse" aria-labelledby="faqHeading2" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                        Pricing depends on your company size and requirements. Contact our sales team for a personalized quote.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Q3 -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="faqHeading3">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse3" aria-expanded="false" aria-controls="faqCollapse3">
+                        Can employees use it on mobile?
+                    </button>
+                </h2>
+                <div id="faqCollapse3" class="accordion-collapse collapse" aria-labelledby="faqHeading3" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                        Yes! TrackHive is fully responsive and works on desktop, tablet, and mobile devices.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Q4 -->
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="faqHeading4">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse4" aria-expanded="false" aria-controls="faqCollapse4">
+                        Do you offer technical support?
+                    </button>
+                </h2>
+                <div id="faqCollapse4" class="accordion-collapse collapse" aria-labelledby="faqHeading4" data-bs-parent="#faqAccordion">
+                    <div class="accordion-body">
+                        Absolutely. Our support team is available via email, live chat, and phone during business hours.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CTA after FAQ -->
+        <div class="text-center mt-5">
+            <a asp-controller="Account" asp-action="Register" class="btn btn-primary btn-lg">
+                🐝 Start Using TrackHive Today
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Pricing Section -->
+<section id="pricing" class="py-5">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold">Simple, transparent pricing</h2>
+            <p class="text-muted">Start free. Scale when you’re ready.</p>
+        </div>
+
+        <div class="row g-4 align-items-stretch">
+            <!-- Free -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 border-success shadow-sm">
+                    <div class="card-body d-flex flex-column">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="text-uppercase text-success mb-2">Free</h6>
+                            <span class="badge bg-success-subtle text-success border border-success">No credit card</span>
+                        </div>
+                        <h3 class="fw-bold mb-0">RM0<span class="fs-6 fw-normal text-muted">/month</span></h3>
+                        <p class="mt-2 text-muted">Kickstart without payment.</p>
+                        <hr>
+                        <ul class="list-unstyled small mb-4">
+                            <li class="mb-2">✅ 1 HR admin</li>
+                            <li class="mb-2">✅ Up to <b>5 employees</b></li>
+                            <li class="mb-2">✅ Attendance & leave</li>
+                            <li class="mb-2">— No payroll export</li>
+                            <li class="mb-2">— 3-month data retention</li>
+                        </ul>
+                        <div class="mt-auto">
+                            <a asp-controller="Account" asp-action="Register" class="btn btn-success w-100">
+                                Start Free
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Starter -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body d-flex flex-column">
+                        <h6 class="text-uppercase text-muted mb-2">Starter</h6>
+                        <h3 class="fw-bold mb-0">RM49<span class="fs-6 fw-normal text-muted">/month</span></h3>
+                        <p class="mt-2 text-muted">For small teams beyond free limits.</p>
+                        <hr>
+                        <ul class="list-unstyled small mb-4">
+                            <li class="mb-2">✅ Everything in Free</li>
+                            <li class="mb-2">✅ More HR admins</li>
+                            <li class="mb-2">✅ More than 5 employees</li>
+                            <li class="mb-2">— Payroll & analytics not included</li>
+                        </ul>
+                        <div class="mt-auto">
+                            <a asp-controller="Account" asp-action="Register" class="btn btn-outline-primary w-100">
+                                Choose Starter
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pro (Most Popular) -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 border-primary shadow">
+                    <div class="card-body d-flex flex-column">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="text-uppercase text-primary mb-2">Pro</h6>
+                            <span class="badge bg-primary-subtle text-primary border border-primary">Most popular</span>
+                        </div>
+                        <h3 class="fw-bold mb-0">RM99<span class="fs-6 fw-normal text-muted">/month</span></h3>
+                        <p class="mt-2 text-muted">Adds payroll & analytics.</p>
+                        <hr>
+                        <ul class="list-unstyled small mb-4">
+                            <li class="mb-2">✅ Everything in Starter</li>
+                            <li class="mb-2">✅ Payroll calculation & exports</li>
+                            <li class="mb-2">✅ Lateness, OT & deductions</li>
+                            <li class="mb-2">✅ Analytics dashboard (Chart.js)</li>
+                        </ul>
+                        <div class="mt-auto">
+                            <a asp-controller="Account" asp-action="Register" class="btn btn-primary w-100">
+                                🐝 Choose Pro
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enterprise -->
+            <div class="col-md-6 col-lg-3">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body d-flex flex-column">
+                        <h6 class="text-uppercase text-muted mb-2">Enterprise</h6>
+                        <h3 class="fw-bold mb-0">RM149<span class="fs-6 fw-normal text-muted">/month</span></h3>
+                        <p class="mt-2 text-muted">All features + custom integrations.</p>
+                        <hr>
+                        <ul class="list-unstyled small mb-4">
+                            <li class="mb-2">✅ Everything in Pro</li>
+                            <li class="mb-2">✅ Advanced role policies & audit</li>
+                            <li class="mb-2">✅ SSO / email / payroll integrations</li>
+                            <li class="mb-2">✅ Priority support</li>
+                        </ul>
+                        <div class="mt-auto">
+                            <a asp-controller="Account" asp-action="Register" class="btn btn-outline-primary w-100">
+                                Choose Enterprise
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+        <!-- Small note -->
+        <p class="text-center text-muted small mt-4">
+            Prices shown are per organization per month. Change plan anytime.
+        </p>
+    </div>
+</section>
