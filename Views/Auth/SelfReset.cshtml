@@ -1,0 +1,32 @@
+﻿@{
+    ViewData["Title"] = "Reset Password (Email Link)";
+}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h1 class="h5 mb-3">Reset Password</h1>
+                <p class="text-secondary">We’ll email a reset link to your account’s email.</p>
+
+                @if (TempData["Toast"] is string toast)
+                {
+                    <div class="alert alert-info alert-dismissible fade show" role="alert">
+                        @toast
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                }
+
+                <form asp-action="SelfResetPost" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="d-grid">
+                        <button class="btn btn-primary" type="submit">Send reset link to my email</button>
+                    </div>
+                </form>
+
+                <div class="text-secondary small mt-3">
+                    Note: If your password was temporary, you’ll still be required to change it after login.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

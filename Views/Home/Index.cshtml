@@ -1,0 +1,40 @@
+﻿@{
+    ViewData["Title"] = "Welcome to TrackHive";
+}
+<div class="row justify-content-center">
+    <div class="col-lg-10 col-xl-9">
+        <div class="p-4 p-md-5 bg-white border rounded-4 shadow-sm">
+            <h1 class="display-6 mb-3">All-in-one Attendance & HR Suite</h1>
+            <p class="lead text-secondary mb-4">
+                TrackHive helps your team manage attendance, advanced reporting, payroll & salary calculation,
+                and leave/medical leave workflows — built with ASP.NET 9 + Bootstrap.
+            </p>
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="border rounded-3 p-3 h-100">
+                        <div class="fw-semibold mb-1">IT</div>
+                        <div class="text-secondary small">Creates organization, configures SMTP, invites HR.</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="border rounded-3 p-3 h-100">
+                        <div class="fw-semibold mb-1">HR</div>
+                        <div class="text-secondary small">Sets policies, invites employees, manages leave/payroll.</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="border rounded-3 p-3 h-100">
+                        <div class="fw-semibold mb-1">Employee</div>
+                        <div class="text-secondary small">Clocks in/out, views balances, requests leave.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-3">
+                <a class="btn btn-primary btn-lg" asp-controller="IT" asp-action="CreateOrg">Get started (IT) →</a>
+                <a class="btn btn-outline-secondary btn-lg disabled" href="#" aria-disabled="true">Learn more (coming soon)</a>
+            </div>
+        </div>
+    </div>
+</div>

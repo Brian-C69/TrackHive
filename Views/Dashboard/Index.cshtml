@@ -1,0 +1,62 @@
+﻿@model TrackHive.Models.InviteHRViewModel
+@{
+    ViewData["Title"] = "IT Dashboard";
+    Layout = "~/Views/Shared/_Layout.App.cshtml";
+    var orgName = (string?)ViewData["OrgName"] ?? "Organization";
+}
+<div class="row">
+    <div class="col-12 col-xl-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-4">
+                <h1 class="h5 mb-2">Welcome, IT (Super Admin)</h1>
+                <div class="text-secondary">Organization: <strong>@orgName</strong></div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="h5 mb-3">Invite HR</h2>
+                <p class="text-secondary">Only IT can invite HR. An email with a temporary password will be sent.</p>
+
+                @if (!string.IsNullOrWhiteSpace(Model?.SuccessMessage))
+                {
+                    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model?.ErrorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+                }
+
+                <form asp-action="InviteHR" asp-controller="Dashboard" method="post" class="row g-3">
+                    @Html.AntiForgeryToken()
+                    <div class="col-md-6">
+                        <label asp-for="Name" class="form-label"></label>
+                        <input asp-for="Name" class="form-control" />
+                        <span asp-validation-for="Name" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="Email" class="form-label"></label>
+                        <input asp-for="Email" class="form-control" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+                    <div class="col-12 d-grid d-sm-flex gap-2">
+                        <button type="submit" class="btn btn-primary">Send Invite</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-4">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <div class="fw-semibold mb-2">Next steps</div>
+                <ol class="text-secondary small mb-0">
+                    <li>HR logs in with the temporary password.</li>
+                    <li>HR must change password on first login.</li>
+                    <li>HR invites employees (Name + Email).</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>

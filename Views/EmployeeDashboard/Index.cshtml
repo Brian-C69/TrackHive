@@ -1,0 +1,13 @@
+﻿@{
+    ViewData["Title"] = "Employee Dashboard";
+    Layout = "~/Views/Shared/_Layout.App.cshtml";
+    var orgName = (string?)ViewData["OrgName"] ?? "Organization";
+    var userName = (string?)ViewData["UserName"] ?? "User";
+}
+<div class="card shadow-sm">
+    <div class="card-body p-4">
+        <h1 class="h5 mb-2">Welcome, @userName</h1>
+        <div class="text-secondary">Organization: <strong>@orgName</strong></div>
+        <p class="mt-3 mb-0">Your employee dashboard is ready. Attendance, leave, and payroll features will appear here.</p>
+    </div>
+</div>

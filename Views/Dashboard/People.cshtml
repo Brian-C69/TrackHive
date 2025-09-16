@@ -1,0 +1,328 @@
+﻿@* File: Views/Dashboard/People.cshtml *@
+@model TrackHive.Models.PeopleListViewModel
+@{
+    Layout = "_Layout.App";
+    ViewData["Title"] = "People";
+
+    var active = Model.ActiveTab;                 // "employees" | "hr"
+    var isIT = User.IsInRole("IT");
+    int start = (Model.TotalCount == 0) ? 0 : ((Model.Page - 1) * Model.PageSize) + 1;
+    int end = Math.Min(Model.Page * Model.PageSize, Model.TotalCount);
+    int totalPages = (int)Math.Ceiling(Model.TotalCount / (double)Model.PageSize);
+}
+
+<div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+        <h1 class="h4 mb-1">People</h1>
+
+        <ul class="nav nav-pills mb-1">
+            <li class="nav-item">
+                <a class="nav-link @(active == "employees" ? "active" : "")"
+                   asp-action="People"
+                   asp-route-tab="employees"
+                   asp-route-q="@Model.Query"
+                   asp-route-sortBy="@Model.SortBy"
+                   asp-route-sortDir="@Model.SortDir"
+                   asp-route-page="1"
+                   asp-route-pageSize="@Model.PageSize">
+                    Employees
+                </a>
+            </li>
+            @if (isIT)
+            {
+                <li class="nav-item">
+                    <a class="nav-link @(active == "hr" ? "active" : "")"
+                       asp-action="People"
+                       asp-route-tab="hr"
+                       asp-route-q="@Model.Query"
+                       asp-route-sortBy="@Model.SortBy"
+                       asp-route-sortDir="@Model.SortDir"
+                       asp-route-page="1"
+                       asp-route-pageSize="@Model.PageSize">
+                        HR
+                    </a>
+                </li>
+            }
+        </ul>
+
+        <div class="small text-secondary">Showing @start–@end of @Model.TotalCount</div>
+    </div>
+
+    <form method="get" asp-action="People" class="d-flex gap-2">
+        <input type="hidden" name="tab" value="@active" />
+        <input type="hidden" name="sortBy" value="@Model.SortBy" />
+        <input type="hidden" name="sortDir" value="@Model.SortDir" />
+        <input class="form-control form-control-sm" type="search" name="q"
+               placeholder="Search name or email…" value="@Model.Query" />
+        <button class="btn btn-sm btn-outline-primary" type="submit">Search</button>
+        @if (!string.IsNullOrWhiteSpace(Model.Query))
+        {
+            <a class="btn btn-sm btn-outline-secondary"
+               asp-action="People"
+               asp-route-tab="@active"
+               asp-route-sortBy="@Model.SortBy"
+               asp-route-sortDir="@Model.SortDir">Clear</a>
+        }
+    </form>
+</div>
+
+@if (TempData["Toast"] is string toast)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @toast
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (TempData["Error"] is string err)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @err
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h2 class="h6">Invite @(active == "hr" ? "HR" : "Employee")</h2>
+        <form asp-action="InviteUser" method="post" class="row g-2">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="returnTab" value="@active" />
+            @if (isIT)
+            {
+                <div class="col-12 col-md-3">
+                    <label class="form-label">Role</label>
+                    <select name="Role" class="form-select">
+                        <option value="3" selected="@(active == "employees" ? "selected" : null)">Employee</option>
+                        <option value="2" selected="@(active == "hr" ? "selected" : null)">HR</option>
+                    </select>
+                </div>
+            }
+            else
+            {
+                <input type="hidden" name="Role" value="3" />
+            }
+
+            <div class="col-12 col-md-4">
+                <label for="Invite_Name" class="form-label">Name</label>
+                <input id="Invite_Name" name="Name" class="form-control" required />
+            </div>
+            <div class="col-12 col-md-5">
+                <label for="Invite_Email" class="form-label">Email</label>
+                <input id="Invite_Email" name="Email" type="email" class="form-control" required />
+            </div>
+            <div class="col-12">
+                <button class="btn btn-primary" type="submit">Send Invite</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h6 mb-0">@(active == "hr" ? "HR" : "Employees")</h2>
+
+            <form asp-action="BulkStatus" method="post" id="bulkForm" class="d-flex gap-2">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="returnTab" value="@active" />
+                <input type="hidden" name="q" value="@Model.Query" />
+                <input type="hidden" name="sortBy" value="@Model.SortBy" />
+                <input type="hidden" name="sortDir" value="@Model.SortDir" />
+                <input type="hidden" name="page" value="@Model.Page" />
+                <input type="hidden" name="pageSize" value="@Model.PageSize" />
+
+                <button type="submit" name="cmd" value="activate" class="btn btn-sm btn-success" disabled id="btnBulkActivate">
+                    Activate selected
+                </button>
+                <button type="submit" name="cmd" value="deactivate" class="btn btn-sm btn-outline-secondary" disabled id="btnBulkDeactivate">
+                    Deactivate selected
+                </button>
+            </form>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-sm align-middle" id="peopleTable">
+                <thead>
+                    <tr>
+                        <th style="width:4%">
+                            <input type="checkbox" id="checkAll" class="form-check-input" />
+                        </th>
+
+                        <th style="width:25%">
+                            <a class="text-body text-decoration-none"
+                               asp-action="People"
+                               asp-route-tab="@active"
+                               asp-route-q="@Model.Query"
+                               asp-route-page="1"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-sortBy="name"
+                               asp-route-sortDir="@(Model.SortBy=="name" && Model.SortDir=="asc" ? "desc" : "asc")">
+                                Name
+                                <span class="ms-1">
+                                    @(Model.SortBy == "name" ? (Model.SortDir == "asc" ? "▲" : "▼") : "")
+                                </span>
+                            </a>
+                        </th>
+
+                        <th style="width:30%">
+                            <a class="text-body text-decoration-none"
+                               asp-action="People"
+                               asp-route-tab="@active"
+                               asp-route-q="@Model.Query"
+                               asp-route-page="1"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-sortBy="email"
+                               asp-route-sortDir="@(Model.SortBy=="email" && Model.SortDir=="asc" ? "desc" : "asc")">
+                                Email
+                                <span class="ms-1">
+                                    @(Model.SortBy == "email" ? (Model.SortDir == "asc" ? "▲" : "▼") : "")
+                                </span>
+                            </a>
+                        </th>
+
+                        <th style="width:20%">Status</th>
+
+                        <th style="width:15%">
+                            <a class="text-body text-decoration-none"
+                               asp-action="People"
+                               asp-route-tab="@active"
+                               asp-route-q="@Model.Query"
+                               asp-route-page="1"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-sortBy="created"
+                               asp-route-sortDir="@(Model.SortBy=="created" && Model.SortDir=="asc" ? "desc" : "asc")">
+                                Created
+                                <span class="ms-1">
+                                    @(Model.SortBy == "created" ? (Model.SortDir == "asc" ? "▲" : "▼") : "")
+                                </span>
+                            </a>
+                        </th>
+                        <th style="width:10%"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in (active == "hr" ? Model.HRs : Model.Employees))
+                    {
+                        <tr>
+                            <td>
+                                <input class="form-check-input row-check" type="checkbox" form="bulkForm" name="ids" value="@u.Id" />
+                            </td>
+                            <td>@u.Name</td>
+                            <td>@u.Email</td>
+                            <td>
+                                @if (u.IsActive)
+                                {
+                                    <span class="badge text-bg-success">Active</span>
+                                }
+                                else
+                                {
+
+                                    <span class="badge text-bg-secondary">Inactive</span>
+                                }
+                                @if (u.IsLocked)
+                                {
+                                    <span class="badge text-bg-warning text-dark ms-1">Locked</span>
+                                }
+                                @if (u.MustChangePassword)
+                                {
+                                    <span class="badge text-bg-info ms-1">Must Change PW</span>
+                                }
+                            </td>
+                            <td>@u.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="text-end">
+                                <a class="btn btn-sm btn-outline-primary" asp-action="Edit" asp-route-id="@u.Id">Edit</a>
+
+                                <form asp-action="ToggleActive" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@u.Id" />
+                                    <input type="hidden" name="returnTab" value="@active" />
+                                    <button type="submit" class="btn btn-sm @(u.IsActive ? "btn-outline-secondary" : "btn-success")">
+                                        @(u.IsActive ? "Deactivate" : "Activate")
+                                    </button>
+                                </form>
+
+                                <form asp-action="DeleteUser" method="post" class="d-inline" onsubmit="return confirm('Delete this user?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@u.Id" />
+                                    <input type="hidden" name="returnTab" value="@active" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (totalPages > 1)
+        {
+            <nav aria-label="People pagination">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(Model.Page == 1 ? "disabled" : "")">
+                        <a class="page-link"
+                           asp-action="People"
+                           asp-route-tab="@active"
+                           asp-route-q="@Model.Query"
+                           asp-route-sortBy="@Model.SortBy"
+                           asp-route-sortDir="@Model.SortDir"
+                           asp-route-page="@(Model.Page - 1)"
+                           asp-route-pageSize="@Model.PageSize">Prev</a>
+                    </li>
+
+                    @for (int p = 1; p <= totalPages; p++)
+                    {
+                        <li class="page-item @(p == Model.Page ? "active" : "")">
+                            <a class="page-link"
+                               asp-action="People"
+                               asp-route-tab="@active"
+                               asp-route-q="@Model.Query"
+                               asp-route-sortBy="@Model.SortBy"
+                               asp-route-sortDir="@Model.SortDir"
+                               asp-route-page="@p"
+                               asp-route-pageSize="@Model.PageSize">@p</a>
+                        </li>
+                    }
+
+                    <li class="page-item @(Model.Page == totalPages ? "disabled" : "")">
+                        <a class="page-link"
+                           asp-action="People"
+                           asp-route-tab="@active"
+                           asp-route-q="@Model.Query"
+                           asp-route-sortBy="@Model.SortBy"
+                           asp-route-sortDir="@Model.SortDir"
+                           asp-route-page="@(Model.Page + 1)"
+                           asp-route-pageSize="@Model.PageSize">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.5/jquery.validate.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate-unobtrusive/3.2.12/jquery.validate.unobtrusive.min.js" crossorigin="anonymous"></script>
+    <script>
+        (function(){
+          const checkAll = document.getElementById('checkAll');
+          const checks = Array.from(document.querySelectorAll('.row-check'));
+          const btnA = document.getElementById('btnBulkActivate');
+          const btnD = document.getElementById('btnBulkDeactivate');
+
+          function updateButtons(){
+            const any = checks.some(c => c.checked);
+            if (btnA) btnA.disabled = !any;
+            if (btnD) btnD.disabled = !any;
+          }
+          if (checkAll){
+            checkAll.addEventListener('change', () => {
+              checks.forEach(c => c.checked = checkAll.checked);
+              updateButtons();
+            });
+          }
+          checks.forEach(c => c.addEventListener('change', updateButtons));
+          updateButtons();
+        })();
+    </script>
+}
