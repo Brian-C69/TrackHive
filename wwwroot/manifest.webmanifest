@@ -1,0 +1,22 @@
+{
+  "name": "TrackHive",
+  "short_name": "TrackHive",
+  "description": "TrackHive keeps you connected to your leave and attendance wherever you are.",
+  "lang": "en",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d6efd",
+  "theme_color": "#0d6efd",
+  "icons": [
+    {
+      "src": "/img/pwa-icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/img/pwa-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
