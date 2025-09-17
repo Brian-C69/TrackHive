@@ -1,0 +1,369 @@
+@model TrackHive.Models.AdminUsersIndexViewModel
+@{
+    Layout = "_Layout.App";
+    ViewData["Title"] = "All users";
+
+    var orgValue = Model.OrganizationId.HasValue ? Model.OrganizationId.Value.ToString() : string.Empty;
+    var roleValue = Model.Role.HasValue ? ((int)Model.Role.Value).ToString() : string.Empty;
+    var statusValue = string.IsNullOrWhiteSpace(Model.Status) ? "any" : Model.Status;
+    int start = Model.TotalCount == 0 ? 0 : ((Model.Page - 1) * Model.PageSize) + 1;
+    int end = Math.Min(Model.Page * Model.PageSize, Model.TotalCount);
+    int totalPages = (int)Math.Ceiling(Model.TotalCount / (double)Model.PageSize);
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h4 mb-1">All users</h1>
+        <div class="small text-secondary">Showing @start–@end of @Model.TotalCount</div>
+    </div>
+    <a class="btn btn-primary" asp-action="Create">Create user</a>
+</div>
+
+@if (TempData["Toast"] is string toast)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @toast
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (TempData["Error"] is string err)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @err
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<form method="get" class="row g-2 align-items-end mb-4">
+    <input type="hidden" name="sortBy" value="@Model.SortBy" />
+    <input type="hidden" name="sortDir" value="@Model.SortDir" />
+    <input type="hidden" name="page" value="1" />
+
+    <div class="col-12 col-md-4 col-xl-3">
+        <label class="form-label" for="filterSearch">Search</label>
+        <input id="filterSearch" name="q" class="form-control" type="search" placeholder="Name or email"
+               value="@Model.Query" />
+    </div>
+    <div class="col-12 col-md-3 col-xl-3">
+        <label class="form-label" for="filterOrg">Organization</label>
+        <select id="filterOrg" name="orgId" class="form-select">
+            <option value="">All organizations</option>
+            @foreach (var org in Model.Organizations)
+            {
+                <option value="@org.Id" selected="@(orgValue == org.Id.ToString() ? "selected" : null)">@org.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col-12 col-md-2 col-xl-2">
+        <label class="form-label" for="filterRole">Role</label>
+        <select id="filterRole" name="role" class="form-select">
+            <option value="">All roles</option>
+            <option value="1" selected="@(roleValue == "1" ? "selected" : null)">IT</option>
+            <option value="2" selected="@(roleValue == "2" ? "selected" : null)">HR</option>
+            <option value="3" selected="@(roleValue == "3" ? "selected" : null)">Employee</option>
+        </select>
+    </div>
+    <div class="col-12 col-md-3 col-xl-2">
+        <label class="form-label" for="filterStatus">Status</label>
+        <select id="filterStatus" name="status" class="form-select">
+            <option value="any" selected="@(statusValue == "any" ? "selected" : null)">Any status</option>
+            <option value="active" selected="@(statusValue == "active" ? "selected" : null)">Active</option>
+            <option value="inactive" selected="@(statusValue == "inactive" ? "selected" : null)">Inactive</option>
+            <option value="locked" selected="@(statusValue == "locked" ? "selected" : null)">Locked</option>
+            <option value="mustchangepassword" selected="@(statusValue == "mustchangepassword" ? "selected" : null)">Must change password</option>
+        </select>
+    </div>
+    <div class="col-12 col-md-2 col-xl-1">
+        <label class="form-label" for="filterPageSize">Page size</label>
+        <select id="filterPageSize" name="pageSize" class="form-select">
+            @foreach (var size in new[] { 10, 15, 25, 50, 100 })
+            {
+                <option value="@size" selected="@(Model.PageSize == size ? "selected" : null)">@size</option>
+            }
+        </select>
+    </div>
+    <div class="col-12 col-md-2 col-xl-1 d-flex gap-2">
+        <button type="submit" class="btn btn-outline-primary flex-grow-1">Apply</button>
+        <a class="btn btn-outline-secondary flex-grow-1" asp-action="Index">Reset</a>
+    </div>
+</form>
+
+<div class="card">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h6 mb-0">Users</h2>
+            <form asp-action="Bulk" method="post" id="bulkForm" class="d-flex gap-2">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="q" value="@Model.Query" />
+                <input type="hidden" name="orgId" value="@orgValue" />
+                <input type="hidden" name="role" value="@roleValue" />
+                <input type="hidden" name="status" value="@statusValue" />
+                <input type="hidden" name="sortBy" value="@Model.SortBy" />
+                <input type="hidden" name="sortDir" value="@Model.SortDir" />
+                <input type="hidden" name="page" value="@Model.Page" />
+                <input type="hidden" name="pageSize" value="@Model.PageSize" />
+
+                <button type="submit" name="cmd" value="activate" class="btn btn-sm btn-success" disabled id="btnBulkActivate">Activate</button>
+                <button type="submit" name="cmd" value="deactivate" class="btn btn-sm btn-outline-secondary" disabled id="btnBulkDeactivate">Deactivate</button>
+                <button type="submit" name="cmd" value="delete" class="btn btn-sm btn-outline-danger" disabled id="btnBulkDelete">Delete</button>
+            </form>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-sm align-middle" id="usersTable">
+                <thead>
+                    <tr>
+                        <th style="width:4%">
+                            <input type="checkbox" id="checkAll" class="form-check-input" />
+                        </th>
+                        <th style="width:20%">
+                            <a class="text-body text-decoration-none"
+                               asp-action="Index"
+                               asp-route-q="@Model.Query"
+                               asp-route-orgId="@(string.IsNullOrEmpty(orgValue) ? null : orgValue)"
+                               asp-route-role="@(string.IsNullOrEmpty(roleValue) ? null : roleValue)"
+                               asp-route-status="@statusValue"
+                               asp-route-sortBy="name"
+                               asp-route-sortDir="@(Model.SortBy == "name" && Model.SortDir == "asc" ? "desc" : "asc")"
+                               asp-route-page="1"
+                               asp-route-pageSize="@Model.PageSize">
+                                Name
+                                <span class="ms-1">@(Model.SortBy == "name" ? (Model.SortDir == "asc" ? "▲" : "▼") : string.Empty)</span>
+                            </a>
+                        </th>
+                        <th style="width:22%">
+                            <a class="text-body text-decoration-none"
+                               asp-action="Index"
+                               asp-route-q="@Model.Query"
+                               asp-route-orgId="@(string.IsNullOrEmpty(orgValue) ? null : orgValue)"
+                               asp-route-role="@(string.IsNullOrEmpty(roleValue) ? null : roleValue)"
+                               asp-route-status="@statusValue"
+                               asp-route-sortBy="email"
+                               asp-route-sortDir="@(Model.SortBy == "email" && Model.SortDir == "asc" ? "desc" : "asc")"
+                               asp-route-page="1"
+                               asp-route-pageSize="@Model.PageSize">
+                                Email
+                                <span class="ms-1">@(Model.SortBy == "email" ? (Model.SortDir == "asc" ? "▲" : "▼") : string.Empty)</span>
+                            </a>
+                        </th>
+                        <th style="width:18%">
+                            <a class="text-body text-decoration-none"
+                               asp-action="Index"
+                               asp-route-q="@Model.Query"
+                               asp-route-orgId="@(string.IsNullOrEmpty(orgValue) ? null : orgValue)"
+                               asp-route-role="@(string.IsNullOrEmpty(roleValue) ? null : roleValue)"
+                               asp-route-status="@statusValue"
+                               asp-route-sortBy="org"
+                               asp-route-sortDir="@(Model.SortBy == "org" && Model.SortDir == "asc" ? "desc" : "asc")"
+                               asp-route-page="1"
+                               asp-route-pageSize="@Model.PageSize">
+                                Organization
+                                <span class="ms-1">@(Model.SortBy == "org" ? (Model.SortDir == "asc" ? "▲" : "▼") : string.Empty)</span>
+                            </a>
+                        </th>
+                        <th style="width:10%">
+                            <a class="text-body text-decoration-none"
+                               asp-action="Index"
+                               asp-route-q="@Model.Query"
+                               asp-route-orgId="@(string.IsNullOrEmpty(orgValue) ? null : orgValue)"
+                               asp-route-role="@(string.IsNullOrEmpty(roleValue) ? null : roleValue)"
+                               asp-route-status="@statusValue"
+                               asp-route-sortBy="role"
+                               asp-route-sortDir="@(Model.SortBy == "role" && Model.SortDir == "asc" ? "desc" : "asc")"
+                               asp-route-page="1"
+                               asp-route-pageSize="@Model.PageSize">
+                                Role
+                                <span class="ms-1">@(Model.SortBy == "role" ? (Model.SortDir == "asc" ? "▲" : "▼") : string.Empty)</span>
+                            </a>
+                        </th>
+                        <th style="width:14%">
+                            <a class="text-body text-decoration-none"
+                               asp-action="Index"
+                               asp-route-q="@Model.Query"
+                               asp-route-orgId="@(string.IsNullOrEmpty(orgValue) ? null : orgValue)"
+                               asp-route-role="@(string.IsNullOrEmpty(roleValue) ? null : roleValue)"
+                               asp-route-status="@statusValue"
+                               asp-route-sortBy="status"
+                               asp-route-sortDir="@(Model.SortBy == "status" && Model.SortDir == "asc" ? "desc" : "asc")"
+                               asp-route-page="1"
+                               asp-route-pageSize="@Model.PageSize">
+                                Status
+                                <span class="ms-1">@(Model.SortBy == "status" ? (Model.SortDir == "asc" ? "▲" : "▼") : string.Empty)</span>
+                            </a>
+                        </th>
+                        <th style="width:12%">
+                            <a class="text-body text-decoration-none"
+                               asp-action="Index"
+                               asp-route-q="@Model.Query"
+                               asp-route-orgId="@(string.IsNullOrEmpty(orgValue) ? null : orgValue)"
+                               asp-route-role="@(string.IsNullOrEmpty(roleValue) ? null : roleValue)"
+                               asp-route-status="@statusValue"
+                               asp-route-sortBy="created"
+                               asp-route-sortDir="@(Model.SortBy == "created" && Model.SortDir == "asc" ? "desc" : "asc")"
+                               asp-route-page="1"
+                               asp-route-pageSize="@Model.PageSize">
+                                Created
+                                <span class="ms-1">@(Model.SortBy == "created" ? (Model.SortDir == "asc" ? "▲" : "▼") : string.Empty)</span>
+                            </a>
+                        </th>
+                        <th style="width:10%"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Users.Any())
+                    {
+                        <tr>
+                            <td colspan="9" class="text-center text-secondary py-4">No users found.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        foreach (var user in Model.Users)
+                        {
+                            <tr>
+                                <td>
+                                    <input class="form-check-input row-check" type="checkbox" form="bulkForm" name="ids" value="@user.Id" />
+                                </td>
+                                <td>@user.Name</td>
+                                <td>@user.Email</td>
+                                <td>@user.Organization</td>
+                                <td>@user.Role</td>
+                                <td>
+                                    @if (user.IsActive)
+                                    {
+                                        <span class="badge text-bg-success">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge text-bg-secondary">Inactive</span>
+                                    }
+                                    @if (user.IsLocked)
+                                    {
+                                        <span class="badge text-bg-warning text-dark ms-1">Locked</span>
+                                    }
+                                    @if (user.MustChangePassword)
+                                    {
+                                        <span class="badge text-bg-info text-dark ms-1">Must change PW</span>
+                                    }
+                                </td>
+                                <td>@user.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                                <td class="text-end">
+                                    <a class="btn btn-sm btn-outline-primary" asp-action="Edit" asp-route-id="@user.Id">Edit</a>
+
+                                    <form asp-action="ToggleActive" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@user.Id" />
+                                        <input type="hidden" name="q" value="@Model.Query" />
+                                        <input type="hidden" name="orgId" value="@orgValue" />
+                                        <input type="hidden" name="role" value="@roleValue" />
+                                        <input type="hidden" name="status" value="@statusValue" />
+                                        <input type="hidden" name="sortBy" value="@Model.SortBy" />
+                                        <input type="hidden" name="sortDir" value="@Model.SortDir" />
+                                        <input type="hidden" name="page" value="@Model.Page" />
+                                        <input type="hidden" name="pageSize" value="@Model.PageSize" />
+                                        <button type="submit" class="btn btn-sm @(user.IsActive ? "btn-outline-secondary" : "btn-success")">
+                                            @(user.IsActive ? "Deactivate" : "Activate")
+                                        </button>
+                                    </form>
+
+                                    <form asp-action="Delete" method="post" class="d-inline" onsubmit="return confirm('Delete this user?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@user.Id" />
+                                        <input type="hidden" name="q" value="@Model.Query" />
+                                        <input type="hidden" name="orgId" value="@orgValue" />
+                                        <input type="hidden" name="role" value="@roleValue" />
+                                        <input type="hidden" name="status" value="@statusValue" />
+                                        <input type="hidden" name="sortBy" value="@Model.SortBy" />
+                                        <input type="hidden" name="sortDir" value="@Model.SortDir" />
+                                        <input type="hidden" name="page" value="@Model.Page" />
+                                        <input type="hidden" name="pageSize" value="@Model.PageSize" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (totalPages > 1)
+        {
+            <nav aria-label="All users pagination">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(Model.Page == 1 ? "disabled" : string.Empty)">
+                        <a class="page-link"
+                           asp-action="Index"
+                           asp-route-q="@Model.Query"
+                           asp-route-orgId="@(string.IsNullOrEmpty(orgValue) ? null : orgValue)"
+                           asp-route-role="@(string.IsNullOrEmpty(roleValue) ? null : roleValue)"
+                           asp-route-status="@statusValue"
+                           asp-route-sortBy="@Model.SortBy"
+                           asp-route-sortDir="@Model.SortDir"
+                           asp-route-page="@(Model.Page - 1)"
+                           asp-route-pageSize="@Model.PageSize">Prev</a>
+                    </li>
+
+                    @for (int p = 1; p <= totalPages; p++)
+                    {
+                        <li class="page-item @(p == Model.Page ? "active" : string.Empty)">
+                            <a class="page-link"
+                               asp-action="Index"
+                               asp-route-q="@Model.Query"
+                               asp-route-orgId="@(string.IsNullOrEmpty(orgValue) ? null : orgValue)"
+                               asp-route-role="@(string.IsNullOrEmpty(roleValue) ? null : roleValue)"
+                               asp-route-status="@statusValue"
+                               asp-route-sortBy="@Model.SortBy"
+                               asp-route-sortDir="@Model.SortDir"
+                               asp-route-page="@p"
+                               asp-route-pageSize="@Model.PageSize">@p</a>
+                        </li>
+                    }
+
+                    <li class="page-item @(Model.Page == totalPages ? "disabled" : string.Empty)">
+                        <a class="page-link"
+                           asp-action="Index"
+                           asp-route-q="@Model.Query"
+                           asp-route-orgId="@(string.IsNullOrEmpty(orgValue) ? null : orgValue)"
+                           asp-route-role="@(string.IsNullOrEmpty(roleValue) ? null : roleValue)"
+                           asp-route-status="@statusValue"
+                           asp-route-sortBy="@Model.SortBy"
+                           asp-route-sortDir="@Model.SortDir"
+                           asp-route-page="@(Model.Page + 1)"
+                           asp-route-pageSize="@Model.PageSize">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" crossorigin="anonymous"></script>
+    <script>
+        (function () {
+            const checkAll = document.getElementById('checkAll');
+            const checks = Array.from(document.querySelectorAll('.row-check'));
+            const btnA = document.getElementById('btnBulkActivate');
+            const btnD = document.getElementById('btnBulkDeactivate');
+            const btnDel = document.getElementById('btnBulkDelete');
+
+            function updateButtons() {
+                const any = checks.some(c => c.checked);
+                if (btnA) btnA.disabled = !any;
+                if (btnD) btnD.disabled = !any;
+                if (btnDel) btnDel.disabled = !any;
+            }
+
+            if (checkAll) {
+                checkAll.addEventListener('change', () => {
+                    checks.forEach(c => c.checked = checkAll.checked);
+                    updateButtons();
+                });
+            }
+
+            checks.forEach(c => c.addEventListener('change', updateButtons));
+            updateButtons();
+        })();
+    </script>
+}
