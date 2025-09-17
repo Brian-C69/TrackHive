@@ -5,6 +5,7 @@ public sealed class HrDashboardViewModel
     public required string OrganizationName { get; init; }
     public InviteEmployeeViewModel Invite { get; init; } = new();
     public IReadOnlyList<LeaveRequestReviewViewModel> PendingLeaveRequests { get; init; } = Array.Empty<LeaveRequestReviewViewModel>();
+    public IReadOnlyList<LeaveCertificateReviewViewModel> PendingCertificateRequests { get; init; } = Array.Empty<LeaveCertificateReviewViewModel>();
     public IReadOnlyList<LeaveBalanceSummaryViewModel> LeaveSummaries { get; init; } = Array.Empty<LeaveBalanceSummaryViewModel>();
     public IReadOnlyList<DashboardNotificationViewModel> Notifications { get; init; } = Array.Empty<DashboardNotificationViewModel>();
 }
@@ -20,6 +21,19 @@ public sealed class LeaveRequestReviewViewModel
     public required DateTimeOffset RequestedAt { get; init; }
     public required int AnnualEntitlement { get; init; }
     public required int AvailableDays { get; init; }
+}
+
+public sealed class LeaveCertificateReviewViewModel
+{
+    public required int RequestId { get; init; }
+    public required string EmployeeName { get; init; }
+    public required LeaveType Type { get; init; }
+    public required DateOnly StartDate { get; init; }
+    public required DateOnly EndDate { get; init; }
+    public required int TotalDays { get; init; }
+    public string? Reason { get; init; }
+    public required DateTimeOffset SubmittedAt { get; init; }
+    public IReadOnlyList<LeaveDocumentViewModel> Documents { get; init; } = Array.Empty<LeaveDocumentViewModel>();
 }
 
 public sealed class LeaveBalanceSummaryViewModel

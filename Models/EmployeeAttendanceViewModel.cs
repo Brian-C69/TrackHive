@@ -38,10 +38,23 @@ public sealed class LeaveRequestListItemViewModel
     public required DateOnly EndDate { get; init; }
     public required int TotalDays { get; init; }
     public required LeaveRequestStatus Status { get; init; }
+    public required LeaveType Type { get; init; }
     public string? Reason { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset? ReviewedAt { get; init; }
     public string? ReviewedByName { get; init; }
+    public IReadOnlyList<LeaveDocumentViewModel> Documents { get; init; } = Array.Empty<LeaveDocumentViewModel>();
+    public bool RequiresMedicalCertificate { get; init; }
+    public bool AwaitingEmployeeUpload => Status is LeaveRequestStatus.ApprovedAwaitingCertificate or LeaveRequestStatus.CertificateRejected;
+    public bool AwaitingHrReview => Status == LeaveRequestStatus.AwaitingCertificateReview;
+}
+
+public sealed class LeaveDocumentViewModel
+{
+    public required int Id { get; init; }
+    public required string FileName { get; init; }
+    public required DateTimeOffset UploadedAt { get; init; }
+    public required string DownloadAction { get; init; }
 }
 
 public sealed class ApplyLeaveViewModel
@@ -54,5 +67,8 @@ public sealed class ApplyLeaveViewModel
 
     [StringLength(500)]
     public string? Reason { get; set; }
+
+    [Required]
+    public LeaveType LeaveType { get; set; } = LeaveType.Annual;
 }
 

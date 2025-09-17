@@ -3,6 +3,8 @@
     ViewData["Title"] = "HR Dashboard";
     Layout = "~/Views/Shared/_Layout.App.cshtml";
     var orgName = Model.OrganizationName;
+    var certificateMessage = TempData["CertificateActionMessage"] as string;
+    var certificateError = TempData["CertificateActionError"] as string;
     string FormatDate(DateOnly value) => value.ToString("MMM d, yyyy");
     string FormatDateRange(DateOnly start, DateOnly end)
     {
@@ -13,6 +15,14 @@
         }
         return $"{FormatDate(start)} – {FormatDate(end)}";
     }
+    string LeaveTypeLabel(LeaveType type) => type switch
+    {
+        LeaveType.Annual => "Annual leave",
+        LeaveType.Sick => "Sick leave",
+        LeaveType.Emergency => "Emergency leave",
+        LeaveType.Unpaid => "Unpaid leave",
+        _ => "Other leave"
+    };
 }
 <div class="row">
     <div class="col-12 col-xl-8">
@@ -86,6 +96,99 @@
                                                 @Html.AntiForgeryToken()
                                                 <input type="hidden" name="id" value="@request.RequestId" />
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">Reject</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h2 class="h5 mb-0">Medical certificates awaiting review</h2>
+                    <span class="badge rounded-pill bg-light text-dark">@Model.PendingCertificateRequests.Count pending</span>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(certificateMessage))
+                {
+                    <div class="alert alert-success" role="alert">@certificateMessage</div>
+                }
+                else if (!string.IsNullOrWhiteSpace(certificateError))
+                {
+                    <div class="alert alert-danger" role="alert">@certificateError</div>
+                }
+
+                @if (Model.PendingCertificateRequests.Count == 0)
+                {
+                    <p class="text-secondary mb-0">No medical certificates are waiting for review.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Employee</th>
+                                    <th scope="col">Leave details</th>
+                                    <th scope="col">Documents</th>
+                                    <th scope="col">Submitted</th>
+                                    <th scope="col" class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var certificate in Model.PendingCertificateRequests)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@certificate.EmployeeName</div>
+                                            <div class="text-secondary small">@LeaveTypeLabel(certificate.Type)</div>
+                                        </td>
+                                        <td>
+                                            <div>@FormatDateRange(certificate.StartDate, certificate.EndDate)</div>
+                                            @if (!string.IsNullOrWhiteSpace(certificate.Reason))
+                                            {
+                                                <div class="text-secondary small">@certificate.Reason</div>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (certificate.Documents.Count == 0)
+                                            {
+                                                <div class="text-secondary small">No documents uploaded.</div>
+                                            }
+                                            else
+                                            {
+                                                <ul class="list-unstyled small mb-0">
+                                                    @foreach (var document in certificate.Documents)
+                                                    {
+                                                        <li>
+                                                            <a class="link-primary" href="@document.DownloadAction" target="_blank" rel="noopener">
+                                                                @document.FileName
+                                                            </a>
+                                                            <span class="text-secondary">(@document.UploadedAt.ToLocalTime():MMM d, yyyy h:mm tt)</span>
+                                                        </li>
+                                                    }
+                                                </ul>
+                                            }
+                                        </td>
+                                        <td>
+                                            <div>@certificate.SubmittedAt.ToLocalTime():MMM d, yyyy</div>
+                                            <div class="text-secondary small">@certificate.SubmittedAt.ToLocalTime():t</div>
+                                        </td>
+                                        <td class="text-end">
+                                            <form asp-action="ApproveCertificate" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@certificate.RequestId" />
+                                                <button type="submit" class="btn btn-sm btn-success me-2">Approve</button>
+                                            </form>
+                                            <form asp-action="RejectCertificate" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@certificate.RequestId" />
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Request new</button>
                                             </form>
                                         </td>
                                     </tr>
