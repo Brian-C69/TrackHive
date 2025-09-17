@@ -11,6 +11,30 @@
         if (!day.CheckOutTime.HasValue) return "In progress";
         return "Complete";
     }
+    string FormatDate(DateOnly value) => value.ToString("MMM d, yyyy");
+    string FormatDateRange(DateOnly start, DateOnly end)
+    {
+        if (start == end) return FormatDate(start);
+        if (start.Year == end.Year)
+        {
+            return $"{start:MMM d} – {end:MMM d, yyyy}";
+        }
+        return $"{FormatDate(start)} – {FormatDate(end)}";
+    }
+    string LeaveStatusLabel(LeaveRequestStatus status) => status switch
+    {
+        LeaveRequestStatus.Pending => "Pending",
+        LeaveRequestStatus.Approved => "Approved",
+        LeaveRequestStatus.Rejected => "Rejected",
+        _ => status.ToString()
+    };
+    string LeaveStatusClass(LeaveRequestStatus status) => status switch
+    {
+        LeaveRequestStatus.Approved => "text-bg-success",
+        LeaveRequestStatus.Pending => "text-bg-warning",
+        LeaveRequestStatus.Rejected => "text-bg-danger",
+        _ => "text-bg-secondary"
+    };
 }
 <div class="card shadow-sm">
     <div class="card-body p-4">
@@ -109,3 +133,129 @@
         </div>
     </div>
 </div>
+
+<div class="row g-4 mt-1">
+    <div class="col-lg-5">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="h6">Leave summary</h2>
+                <dl class="row small mb-3">
+                    <dt class="col-6 text-secondary">Annual entitlement</dt>
+                    <dd class="col-6 mb-2">@Model.LeaveBalance.AnnualEntitlement day(s)</dd>
+                    <dt class="col-6 text-secondary">Used</dt>
+                    <dd class="col-6 mb-2">@Model.LeaveBalance.UsedDays day(s)</dd>
+                    <dt class="col-6 text-secondary">Pending</dt>
+                    <dd class="col-6 mb-2">@Model.LeaveBalance.PendingDays day(s)</dd>
+                    <dt class="col-6 text-secondary">Available</dt>
+                    <dd class="col-6 mb-0">@Model.LeaveBalance.RemainingDays day(s)</dd>
+                </dl>
+
+                @if (TempData["LeaveMessage"] is string leaveSuccess)
+                {
+                    <div class="alert alert-success" role="alert">@leaveSuccess</div>
+                }
+                else if (TempData["LeaveError"] is string leaveError)
+                {
+                    <div class="alert alert-danger" role="alert">@leaveError</div>
+                }
+                else
+                {
+                    <p class="text-secondary small">Pending requests are deducted from your available balance.</p>
+                }
+
+                <form asp-action="ApplyLeave" method="post" class="row g-3 mt-1">
+                    @Html.AntiForgeryToken()
+                    <div class="col-sm-6">
+                        <label asp-for="LeaveApplication.StartDate" class="form-label">Start</label>
+                        <input asp-for="LeaveApplication.StartDate" class="form-control" type="date" />
+                    </div>
+                    <div class="col-sm-6">
+                        <label asp-for="LeaveApplication.EndDate" class="form-label">End</label>
+                        <input asp-for="LeaveApplication.EndDate" class="form-control" type="date" />
+                    </div>
+                    <div class="col-12">
+                        <label asp-for="LeaveApplication.Reason" class="form-label">Reason (optional)</label>
+                        <textarea asp-for="LeaveApplication.Reason" class="form-control" rows="3" maxlength="500"></textarea>
+                        <div class="form-text">Provide context for HR approvals.</div>
+                    </div>
+                    <div class="col-12 d-grid d-sm-flex gap-2">
+                        <button type="submit" class="btn btn-primary">Submit request</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h2 class="h6 mb-0">Leave requests</h2>
+                    <span class="badge rounded-pill bg-light text-dark">@Model.LeaveRequests.Count total</span>
+                </div>
+
+                @if (Model.LeaveRequests.Count == 0)
+                {
+                    <p class="text-secondary mb-0">No leave requests submitted yet.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Dates</th>
+                                    <th scope="col" class="text-center">Days</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col">Submitted</th>
+                                    <th scope="col">Reviewed by</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var request in Model.LeaveRequests)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div>@FormatDateRange(request.StartDate, request.EndDate)</div>
+                                            @if (!string.IsNullOrWhiteSpace(request.Reason))
+                                            {
+                                                <div class="text-secondary small">@request.Reason</div>
+                                            }
+                                        </td>
+                                        <td class="text-center">@request.TotalDays</td>
+                                        <td>
+                                            <span class="badge @LeaveStatusClass(request.Status)">@LeaveStatusLabel(request.Status)</span>
+                                        </td>
+                                        <td>
+                                            <div>@request.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")</div>
+                                            <div class="text-secondary small">@request.CreatedAt.ToLocalTime().ToString("t")</div>
+                                        </td>
+                                        <td>
+                                            @if (request.Status == LeaveRequestStatus.Pending)
+                                            {
+                                                <span class="text-secondary">Pending</span>
+                                            }
+                                            else if (!string.IsNullOrWhiteSpace(request.ReviewedByName))
+                                            {
+                                                <div>@request.ReviewedByName</div>
+                                                @if (request.ReviewedAt is { } reviewedAt)
+                                                {
+                                                    <div class="text-secondary small">@reviewedAt.ToLocalTime().ToString("MMM d, yyyy")</div>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <span class="text-secondary">—</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+
