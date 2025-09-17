@@ -1,11 +1,18 @@
-﻿@{
+@{
     var title = ViewData["Title"] as string ?? "TrackHive";
-    bool isIT = User?.IsInRole("IT") ?? false;  
-    bool isHR = User?.IsInRole("HR") ?? false;  
-    bool isEmployee = User?.IsInRole("Employee") ?? false;  
+    var themeClaim = User?.FindFirstValue(UserClaimTypes.ThemePreference) ?? "light";
+    var theme = string.Equals(themeClaim, "dark", System.StringComparison.OrdinalIgnoreCase) ? "dark" : "light";
+    var navOrderClaim = User?.FindFirstValue(UserClaimTypes.NavigationOrder);
+    var navLinks = new List<NavigationLink>();
+
+    var roleValue = User?.FindFirstValue(System.Security.Claims.ClaimTypes.Role);
+    if (!string.IsNullOrWhiteSpace(roleValue) && Enum.TryParse<RoleType>(roleValue, out var role))
+    {
+        navLinks = NavigationMenu.ApplyOrder(NavigationMenu.GetLinksForRole(role), navOrderClaim).ToList();
+    }
 }
 <!doctype html>
-<html lang="en" data-bs-theme="light">
+<html lang="en" data-bs-theme="@theme">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -22,62 +29,21 @@
                 <a class="navbar-brand fw-bold text-decoration-none" asp-controller="Home" asp-action="Index">TrackHive</a>
             </div>
             <nav class="nav flex-column py-2">
-                <div class="px-3 text-uppercase small text-secondary mt-2 mb-1">Main</div>
+                @{
+                    string? currentSection = null;
+                    foreach (var item in navLinks)
+                    {
+                        if (!string.Equals(item.Section, currentSection, System.StringComparison.Ordinal))
+                        {
+                            currentSection = item.Section;
+                            <div class="px-3 text-uppercase small text-secondary mt-2 mb-1">@currentSection</div>;
+                        }
 
-                @if (isIT)
-                {
-                    <a class="nav-link d-flex align-items-center" asp-controller="Dashboard" asp-action="Index" title="IT Dashboard" aria-label="IT Dashboard">
-                        <i class="bi bi-speedometer2 nav-link-icon" aria-hidden="true"></i>
-                        <span class="nav-link-label">IT Dashboard</span>
-                    </a>
-                    <div class="px-3 text-uppercase small text-secondary mt-3 mb-1">Admin</div>
-                    <a class="nav-link d-flex align-items-center" asp-controller="Users" asp-action="Index" title="All users" aria-label="All users">
-                        <i class="bi bi-diagram-3 nav-link-icon" aria-hidden="true"></i>
-                        <span class="nav-link-label">All users</span>
-                    </a>
-                    <a class="nav-link d-flex align-items-center" asp-controller="Dashboard" asp-action="People" title="People" aria-label="People">
-                        <i class="bi bi-people nav-link-icon" aria-hidden="true"></i>
-                        <span class="nav-link-label">People</span>
-                    </a>
-                    <a class="nav-link d-flex align-items-center" href="#" title="Settings" aria-label="Settings">
-                        <i class="bi bi-gear nav-link-icon" aria-hidden="true"></i>
-                        <span class="nav-link-label">Settings</span>
-                    </a>
-                    <a class="nav-link d-flex align-items-center" asp-controller="Profile" asp-action="Index" title="My profile" aria-label="My profile">
-                        <i class="bi bi-person-circle nav-link-icon" aria-hidden="true"></i>
-                        <span class="nav-link-label">My profile</span>
-                    </a>
-                }
-                else if (isHR)
-                {
-                    <a class="nav-link d-flex align-items-center" asp-controller="HrDashboard" asp-action="Index" title="HR Dashboard" aria-label="HR Dashboard">
-                        <i class="bi bi-graph-up nav-link-icon" aria-hidden="true"></i>
-                        <span class="nav-link-label">HR Dashboard</span>
-                    </a>
-                    <div class="px-3 text-uppercase small text-secondary mt-3 mb-1">Admin</div>
-                    <a class="nav-link d-flex align-items-center" asp-controller="Dashboard" asp-action="People" title="People" aria-label="People">
-                        <i class="bi bi-people nav-link-icon" aria-hidden="true"></i>
-                        <span class="nav-link-label">People</span>
-                    </a>
-                    <a class="nav-link d-flex align-items-center" asp-controller="Payroll" asp-action="Index" title="Payroll" aria-label="Payroll">
-                        <i class="bi bi-cash-stack nav-link-icon" aria-hidden="true"></i>
-                        <span class="nav-link-label">Payroll</span>
-                    </a>
-                    <a class="nav-link d-flex align-items-center" asp-controller="Profile" asp-action="Index" title="My profile" aria-label="My profile">
-                        <i class="bi bi-person-circle nav-link-icon" aria-hidden="true"></i>
-                        <span class="nav-link-label">My profile</span>
-                    </a>
-                }
-                else if (isEmployee)
-                {
-                    <a class="nav-link d-flex align-items-center" asp-controller="EmployeeDashboard" asp-action="Index" title="Employee Dashboard" aria-label="Employee Dashboard">
-                        <i class="bi bi-speedometer2 nav-link-icon" aria-hidden="true"></i>
-                        <span class="nav-link-label">Employee Dashboard</span>
-                    </a>
-                    <a class="nav-link d-flex align-items-center" asp-controller="Profile" asp-action="Index" title="My profile" aria-label="My profile">
-                        <i class="bi bi-person-circle nav-link-icon" aria-hidden="true"></i>
-                        <span class="nav-link-label">My profile</span>
-                    </a>
+                        <a class="nav-link d-flex align-items-center" asp-controller="@item.Controller" asp-action="@item.Action" title="@item.Label" aria-label="@item.Label">
+                            <i class="bi @item.Icon nav-link-icon" aria-hidden="true"></i>
+                            <span class="nav-link-label">@item.Label</span>
+                        </a>
+                    }
                 }
             </nav>
         </aside>
@@ -109,7 +75,7 @@
                 @RenderBody()
             </main>
 
-            <footer class="mt-auto text-center text-secondary small py-3 border-top bg-white">
+            <footer class="mt-auto text-center text-secondary small py-3 border-top bg-body">
                 © @DateTime.UtcNow.Year TrackHive
             </footer>
         </div>

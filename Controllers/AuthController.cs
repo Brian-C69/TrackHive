@@ -1,4 +1,5 @@
 ﻿// File: Controllers/AuthController.cs
+using System;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authentication;
@@ -289,14 +290,25 @@ public sealed class AuthController : Controller
     private async Task SignInAsync(AppUser user)
     {
         // fully-qualify to avoid any Claim/Identity type shadowing
+        var theme = string.Equals(user.ThemePreference, "dark", StringComparison.OrdinalIgnoreCase)
+            ? "dark"
+            : "light";
+        var navOrder = user.NavigationOrder ?? string.Empty;
+
         var claims = new List<System.Security.Claims.Claim>
         {
             new(System.Security.Claims.ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(System.Security.Claims.ClaimTypes.Name, user.Name),
             new(System.Security.Claims.ClaimTypes.Email, user.Email),
             new(System.Security.Claims.ClaimTypes.Role, user.Role.ToString()),
-            new("OrgId", user.OrganizationId.ToString())
+            new(UserClaimTypes.OrganizationId, user.OrganizationId.ToString()),
+            new(UserClaimTypes.ThemePreference, theme)
         };
+
+        if (!string.IsNullOrWhiteSpace(navOrder))
+        {
+            claims.Add(new(UserClaimTypes.NavigationOrder, navOrder));
+        }
 
         var identity = new System.Security.Claims.ClaimsIdentity(
             claims, CookieAuthenticationDefaults.AuthenticationScheme);

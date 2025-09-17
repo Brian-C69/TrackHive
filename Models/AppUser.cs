@@ -35,6 +35,13 @@ public sealed class AppUser
     public int FailedLoginCount { get; set; } = 0;
     public bool IsLocked { get; set; } = false;
 
+    [Required]
+    [StringLength(20)]
+    public string ThemePreference { get; set; } = "light";
+
+    [StringLength(256)]
+    public string? NavigationOrder { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [Column(TypeName = "decimal(18,2)")]
