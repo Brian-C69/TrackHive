@@ -36,4 +36,8 @@ public sealed class AppUser
     public bool IsLocked { get; set; } = false;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [Column(TypeName = "decimal(18,2)")]
+    [Range(0, 1_000_000, ErrorMessage = "Monthly salary must be positive.")]
+    public decimal MonthlySalary { get; set; }
 }
