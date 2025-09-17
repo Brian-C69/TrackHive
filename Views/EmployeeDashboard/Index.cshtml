@@ -4,6 +4,9 @@
     ViewData["Title"] = "Employee Dashboard";
     Layout = "~/Views/Shared/_Layout.App.cshtml";
 
+    var certificateMessage = TempData["CertificateMessage"] as string;
+    var certificateError = TempData["CertificateError"] as string;
+
     string FormatTime(DateTimeOffset? value) => value is null ? "—" : value.Value.ToLocalTime().ToString("g");
     string StatusFor(AttendanceDayViewModel day)
     {
@@ -26,6 +29,9 @@
         LeaveRequestStatus.Pending => "Pending",
         LeaveRequestStatus.Approved => "Approved",
         LeaveRequestStatus.Rejected => "Rejected",
+        LeaveRequestStatus.ApprovedAwaitingCertificate => "Awaiting certificate",
+        LeaveRequestStatus.AwaitingCertificateReview => "Certificate submitted",
+        LeaveRequestStatus.CertificateRejected => "Certificate rejected",
         _ => status.ToString()
     };
     string LeaveStatusClass(LeaveRequestStatus status) => status switch
@@ -33,7 +39,18 @@
         LeaveRequestStatus.Approved => "text-bg-success",
         LeaveRequestStatus.Pending => "text-bg-warning",
         LeaveRequestStatus.Rejected => "text-bg-danger",
+        LeaveRequestStatus.CertificateRejected => "text-bg-danger",
+        LeaveRequestStatus.ApprovedAwaitingCertificate => "text-bg-primary",
+        LeaveRequestStatus.AwaitingCertificateReview => "text-bg-info",
         _ => "text-bg-secondary"
+    };
+    string LeaveTypeLabel(LeaveType type) => type switch
+    {
+        LeaveType.Annual => "Annual leave",
+        LeaveType.Sick => "Sick leave",
+        LeaveType.Emergency => "Emergency leave",
+        LeaveType.Unpaid => "Unpaid leave",
+        _ => "Other leave"
     };
 }
 <div class="card shadow-sm">
@@ -173,6 +190,11 @@
                         <label asp-for="LeaveApplication.EndDate" class="form-label">End</label>
                         <input asp-for="LeaveApplication.EndDate" class="form-control" type="date" />
                     </div>
+                    <div class="col-sm-6">
+                        <label asp-for="LeaveApplication.LeaveType" class="form-label">Type</label>
+                        <select asp-for="LeaveApplication.LeaveType" class="form-select" asp-items="Html.GetEnumSelectList<LeaveType>()"></select>
+                        <span asp-validation-for="LeaveApplication.LeaveType" class="text-danger small"></span>
+                    </div>
                     <div class="col-12">
                         <label asp-for="LeaveApplication.Reason" class="form-label">Reason (optional)</label>
                         <textarea asp-for="LeaveApplication.Reason" class="form-control" rows="3" maxlength="500"></textarea>
@@ -193,6 +215,15 @@
                     <span class="badge rounded-pill bg-light text-dark">@Model.LeaveRequests.Count total</span>
                 </div>
 
+                @if (!string.IsNullOrWhiteSpace(certificateMessage))
+                {
+                    <div class="alert alert-success" role="alert">@certificateMessage</div>
+                }
+                else if (!string.IsNullOrWhiteSpace(certificateError))
+                {
+                    <div class="alert alert-danger" role="alert">@certificateError</div>
+                }
+
                 @if (Model.LeaveRequests.Count == 0)
                 {
                     <p class="text-secondary mb-0">No leave requests submitted yet.</p>
@@ -204,6 +235,7 @@
                             <thead>
                                 <tr>
                                     <th scope="col">Dates</th>
+                                    <th scope="col">Type</th>
                                     <th scope="col" class="text-center">Days</th>
                                     <th scope="col">Status</th>
                                     <th scope="col">Submitted</th>
@@ -219,6 +251,72 @@
                                             @if (!string.IsNullOrWhiteSpace(request.Reason))
                                             {
                                                 <div class="text-secondary small">@request.Reason</div>
+                                            }
+
+                                            @if (request.RequiresMedicalCertificate)
+                                            {
+                                                <div class="mt-2">
+                                                    <div class="text-secondary small mb-2">
+                                                        Medical certificate status:
+                                                        <strong>@LeaveStatusLabel(request.Status)</strong>
+                                                    </div>
+
+                                                    @if (request.Documents.Count > 0)
+                                                    {
+                                                        <ul class="list-unstyled small mb-2">
+                                                            @foreach (var document in request.Documents)
+                                                            {
+                                                                <li>
+                                                                    <a class="link-primary" href="@document.DownloadAction" target="_blank" rel="noopener">
+                                                                        @document.FileName
+                                                                    </a>
+                                                                    <span class="text-secondary">(@document.UploadedAt.ToLocalTime():MMM d, yyyy h:mm tt)</span>
+                                                                </li>
+                                                            }
+                                                        </ul>
+                                                    }
+
+                                                    @if (request.AwaitingEmployeeUpload)
+                                                    {
+                                                        if (request.Status == LeaveRequestStatus.CertificateRejected)
+                                                        {
+                                                            <div class="alert alert-warning py-2 px-3 small mb-2">
+                                                                HR requested a new medical certificate. Please upload a replacement.
+                                                            </div>
+                                                        }
+
+                                                        <form asp-action="SubmitMedicalCertificate" method="post" enctype="multipart/form-data" class="leave-document-form">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="requestId" value="@request.Id" />
+                                                            <div class="leave-dropzone" data-dropzone>
+                                                                <p class="fw-semibold mb-1">Drag &amp; drop medical certificate</p>
+                                                                <p class="text-secondary small mb-2">Upload images or PDF documents. Each file must be 5&nbsp;MB or smaller. You can upload multiple files at once.</p>
+                                                                <div class="leave-dropzone-files text-secondary small"></div>
+                                                                <input class="leave-dropzone-input" type="file" name="files" multiple accept="image/*,.pdf" />
+                                                            </div>
+                                                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                                                <button type="submit" class="btn btn-sm btn-primary">Submit certificate</button>
+                                                            </div>
+                                                        </form>
+                                                    }
+                                                    else if (request.AwaitingHrReview)
+                                                    {
+                                                        @{ 
+                                                            var latest = request.Documents.OrderByDescending(d => d.UploadedAt).FirstOrDefault();
+                                                            var submittedOn = latest?.UploadedAt.ToLocalTime() ?? request.CreatedAt.ToLocalTime();
+                                                        }
+                                                        <div class="alert alert-info py-2 px-3 small mb-0">
+                                                            Submitted to HR on @submittedOn:MMM d, yyyy h:mm tt.
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
+                                        </td>
+                                        <td>
+                                            <div>@LeaveTypeLabel(request.Type)</div>
+                                            @if (request.RequiresMedicalCertificate)
+                                            {
+                                                <div class="text-secondary small">Medical certificate required</div>
                                             }
                                         </td>
                                         <td class="text-center">@request.TotalDays</td>
@@ -258,4 +356,35 @@
     </div>
 </div>
 
+
+@section HeadContent {
+    <style>
+        .leave-dropzone {
+            border: 2px dashed #94a3b8;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            background-color: #f8fafc;
+            transition: border-color 0.2s ease, background-color 0.2s ease;
+        }
+
+        .leave-dropzone.drag-over {
+            border-color: #2563eb;
+            background-color: #e0f2fe;
+        }
+
+        .leave-dropzone-input {
+            display: none;
+        }
+
+        .leave-dropzone-files {
+            min-height: 1.5rem;
+        }
+    </style>
+}
+
+@section Scripts {
+    <script src="~/js/leave-documents.js"></script>
+}
 
