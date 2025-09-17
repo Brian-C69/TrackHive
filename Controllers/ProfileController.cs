@@ -1,4 +1,6 @@
+using System;
 using System.IO;
+using System.Linq;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -11,6 +13,7 @@ using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using TrackHive.Models;
+using TrackHive.Services;
 
 namespace TrackHive.Controllers;
 
@@ -47,6 +50,59 @@ public sealed class ProfileController : Controller
         };
 
         return View(model);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Preferences()
+    {
+        var user = await GetCurrentUserAsync();
+        if (user is null) return RedirectToAction("Login", "Auth");
+
+        var theme = NormalizeTheme(user.ThemePreference);
+        var orderedLinks = NavigationMenu.ApplyOrder(NavigationMenu.GetLinksForRole(user.Role), user.NavigationOrder);
+
+        var model = new UserPreferencesViewModel
+        {
+            Theme = theme,
+            NavigationLinks = orderedLinks.ToList(),
+            NavigationOrder = string.Join(',', orderedLinks.Select(link => link.Id))
+        };
+
+        return View(model);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Preferences(UserPreferencesViewModel model)
+    {
+        var user = await GetCurrentUserAsync();
+        if (user is null) return RedirectToAction("Login", "Auth");
+
+        var theme = NormalizeTheme(model.Theme);
+        var baseLinks = NavigationMenu.GetLinksForRole(user.Role);
+        var orderedLinks = NavigationMenu.ApplyOrder(baseLinks, model.NavigationOrder);
+        var normalizedOrder = string.Join(',', orderedLinks.Select(link => link.Id));
+        var defaultOrder = string.Join(',', baseLinks.Select(link => link.Id));
+
+        model.Theme = theme;
+        model.NavigationLinks = orderedLinks.ToList();
+        model.NavigationOrder = normalizedOrder;
+
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        user.ThemePreference = theme;
+        user.NavigationOrder = string.IsNullOrEmpty(normalizedOrder) || normalizedOrder == defaultOrder
+            ? null
+            : normalizedOrder;
+
+        await _db.SaveChangesAsync();
+        await RefreshSignInAsync(user);
+
+        TempData["Toast"] = "Preferences updated.";
+        return RedirectToAction(nameof(Preferences));
     }
 
     [HttpPost]
@@ -119,14 +175,23 @@ public sealed class ProfileController : Controller
 
     private async Task RefreshSignInAsync(AppUser user)
     {
+        var theme = NormalizeTheme(user.ThemePreference);
+        var navOrder = user.NavigationOrder ?? string.Empty;
+
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.Name),
             new(ClaimTypes.Email, user.Email),
             new(ClaimTypes.Role, user.Role.ToString()),
-            new("OrgId", user.OrganizationId.ToString())
+            new(UserClaimTypes.OrganizationId, user.OrganizationId.ToString()),
+            new(UserClaimTypes.ThemePreference, theme)
         };
+
+        if (!string.IsNullOrWhiteSpace(navOrder))
+        {
+            claims.Add(new(UserClaimTypes.NavigationOrder, navOrder));
+        }
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
@@ -136,6 +201,9 @@ public sealed class ProfileController : Controller
             principal,
             new AuthenticationProperties { IsPersistent = true, AllowRefresh = true });
     }
+
+    private static string NormalizeTheme(string? value) =>
+        string.Equals(value, "dark", StringComparison.OrdinalIgnoreCase) ? "dark" : "light";
 
     private async Task<string?> SaveProfileImageAsync(AppUser user, ProfileViewModel model)
     {
