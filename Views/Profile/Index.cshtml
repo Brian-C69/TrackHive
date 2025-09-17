@@ -1,0 +1,347 @@
+@using System.Linq
+@model TrackHive.Models.ProfileViewModel
+@{
+    ViewData["Title"] = "My profile";
+    var placeholder = Url.Content("~/img/avatar-placeholder.svg");
+    var previewImage = !string.IsNullOrWhiteSpace(Model.ExistingImagePath) ? Model.ExistingImagePath : placeholder;
+    var initials = "U";
+    if (!string.IsNullOrWhiteSpace(Model.Name))
+    {
+        var parts = Model.Name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length > 0)
+        {
+            initials = string.Concat(parts.Take(2).Select(p => char.ToUpperInvariant(p[0])));
+        }
+    }
+}
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <div class="profile-avatar mx-auto mb-3">
+                    <img id="profilePreview" class="profile-avatar-img" src="@previewImage" alt="Profile photo" data-placeholder="@placeholder" />
+                    @if (string.IsNullOrWhiteSpace(Model.ExistingImagePath))
+                    {
+                        <span class="profile-avatar-fallback">@initials</span>
+                    }
+                </div>
+                <h2 class="h5 mb-1">@Model.Name</h2>
+                @if (!string.IsNullOrWhiteSpace(Model.JobTitle))
+                {
+                    <div class="text-secondary">@Model.JobTitle</div>
+                }
+                <div class="mt-3 text-start small text-secondary">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="fw-semibold">Email:</span>
+                        <span>@Model.Email</span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(Model.PhoneNumber))
+                    {
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="fw-semibold">Phone:</span>
+                            <span>@Model.PhoneNumber</span>
+                        </div>
+                    }
+                    @if (Model.BirthDate is not null)
+                    {
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="fw-semibold">Birthdate:</span>
+                            <span>@Model.BirthDate:MMMM d, yyyy</span>
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.Address))
+                    {
+                        <div class="d-flex align-items-start gap-2">
+                            <span class="fw-semibold">Address:</span>
+                            <span>@Model.Address</span>
+                        </div>
+                    }
+                </div>
+                @if (!string.IsNullOrWhiteSpace(Model.About))
+                {
+                    <p class="mt-3 small text-secondary">@Model.About</p>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h1 class="h5 mb-3">Profile details</h1>
+
+                @if (TempData["Toast"] is string toast)
+                {
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        @toast
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                }
+
+                <form asp-action="Index" method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                    @Html.AntiForgeryToken()
+
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="Name" class="form-label"></label>
+                        <input asp-for="Name" class="form-control" />
+                        <span asp-validation-for="Name" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Email" class="form-label"></label>
+                        <input asp-for="Email" class="form-control" readonly />
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label asp-for="BirthDate" class="form-label"></label>
+                            <input asp-for="BirthDate" class="form-control" type="date" />
+                            <span asp-validation-for="BirthDate" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="PhoneNumber" class="form-label"></label>
+                            <input asp-for="PhoneNumber" class="form-control" />
+                            <span asp-validation-for="PhoneNumber" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-0">
+                        <div class="col-md-6">
+                            <label asp-for="JobTitle" class="form-label"></label>
+                            <input asp-for="JobTitle" class="form-control" />
+                            <span asp-validation-for="JobTitle" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="Address" class="form-label"></label>
+                            <input asp-for="Address" class="form-control" />
+                            <span asp-validation-for="Address" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 mt-3">
+                        <label asp-for="About" class="form-label"></label>
+                        <textarea asp-for="About" class="form-control" rows="3"></textarea>
+                        <span asp-validation-for="About" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Profile photo</label>
+                        <div class="d-flex flex-wrap align-items-center gap-3">
+                            <div class="profile-avatar profile-avatar-edit">
+                                <img id="profilePreviewSmall" class="profile-avatar-img" src="@previewImage" alt="Profile photo preview" data-placeholder="@placeholder" />
+                            </div>
+                            <div class="d-flex flex-column gap-2">
+                                <label class="btn btn-outline-primary btn-sm mb-0">
+                                    Upload new photo
+                                    <input asp-for="ProfileImage" id="profileImageInput" class="d-none" type="file" accept="image/*" />
+                                </label>
+                                <div class="form-check">
+                                    <input class="form-check-input" asp-for="RemoveImage" id="removeImageCheck" />
+                                    <label class="form-check-label" for="removeImageCheck">Remove current photo</label>
+                                </div>
+                                <small class="text-secondary">JPG or PNG, up to 5 MB.</small>
+                                <span asp-validation-for="ProfileImage" class="text-danger"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <input type="hidden" asp-for="CropX" />
+                    <input type="hidden" asp-for="CropY" />
+                    <input type="hidden" asp-for="CropWidth" />
+                    <input type="hidden" asp-for="CropHeight" />
+
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cropperModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Crop profile photo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="cropper-wrapper">
+                    <img id="cropperImage" src="#" alt="Crop source" class="img-fluid" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="applyCropBtn">Apply crop</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section HeadContent {
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css" />
+    <style>
+        .profile-avatar {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #e2e8f0;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .profile-avatar.profile-avatar-edit {
+            width: 96px;
+            height: 96px;
+        }
+
+        .profile-avatar-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .profile-avatar-fallback {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 2rem;
+            color: #64748b;
+        }
+
+        .cropper-wrapper {
+            min-height: 360px;
+            background: #f8fafc;
+        }
+    </style>
+}
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+    <script>
+        (function () {
+            const fileInput = document.getElementById('profileImageInput');
+            const cropperModalEl = document.getElementById('cropperModal');
+            const cropperImage = document.getElementById('cropperImage');
+            const previewLarge = document.getElementById('profilePreview');
+            const previewSmall = document.getElementById('profilePreviewSmall');
+            const removeCheck = document.getElementById('removeImageCheck');
+            const cropX = document.getElementById('CropX');
+            const cropY = document.getElementById('CropY');
+            const cropW = document.getElementById('CropWidth');
+            const cropH = document.getElementById('CropHeight');
+            const applyBtn = document.getElementById('applyCropBtn');
+            const modal = new bootstrap.Modal(cropperModalEl);
+            let cropper;
+            let hasAppliedCrop = false;
+
+            const placeholder = previewLarge.dataset.placeholder;
+            const placeholderAbsolute = new URL(placeholder, window.location.origin).href;
+            const fallback = document.querySelector('.profile-avatar-fallback');
+
+            function resetCropData() {
+                cropX.value = '';
+                cropY.value = '';
+                cropW.value = '';
+                cropH.value = '';
+            }
+
+            function updatePreview(src) {
+                const finalSrc = src || placeholder;
+                previewLarge.src = finalSrc;
+                previewSmall.src = finalSrc;
+                if (fallback) {
+                    const current = new URL(finalSrc, window.location.origin).href;
+                    fallback.style.display = current === placeholderAbsolute ? 'flex' : 'none';
+                }
+                if (!src) {
+                    resetCropData();
+                }
+            }
+
+            removeCheck?.addEventListener('change', function () {
+                if (removeCheck.checked) {
+                    fileInput.value = '';
+                    updatePreview();
+                }
+            });
+
+            fileInput?.addEventListener('change', function () {
+                const [file] = fileInput.files;
+                if (!file) {
+                    return;
+                }
+
+                if (!file.type.startsWith('image/')) {
+                    alert('Please select a valid image file.');
+                    fileInput.value = '';
+                    return;
+                }
+
+                hasAppliedCrop = false;
+                removeCheck.checked = false;
+
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    cropperImage.src = e.target.result;
+                    modal.show();
+                };
+                reader.readAsDataURL(file);
+            });
+
+            cropperModalEl.addEventListener('shown.bs.modal', function () {
+                if (cropper) {
+                    cropper.destroy();
+                }
+                cropper = new Cropper(cropperImage, {
+                    aspectRatio: 1,
+                    viewMode: 1,
+                    background: false,
+                    autoCropArea: 1,
+                    responsive: true,
+                });
+            });
+
+            cropperModalEl.addEventListener('hidden.bs.modal', function () {
+                if (!hasAppliedCrop) {
+                    fileInput.value = '';
+                    cropperImage.src = '#';
+                }
+                if (cropper) {
+                    cropper.destroy();
+                    cropper = null;
+                }
+            });
+
+            applyBtn?.addEventListener('click', function () {
+                if (!cropper) {
+                    return;
+                }
+
+                const data = cropper.getData(true);
+                cropX.value = Math.max(0, Math.round(data.x));
+                cropY.value = Math.max(0, Math.round(data.y));
+                cropW.value = Math.max(0, Math.round(data.width));
+                cropH.value = Math.max(0, Math.round(data.height));
+
+                const canvas = cropper.getCroppedCanvas({ width: 256, height: 256, imageSmoothingQuality: 'high' });
+                const previewSrc = canvas.toDataURL('image/jpeg');
+                updatePreview(previewSrc);
+
+                hasAppliedCrop = true;
+                modal.hide();
+            });
+
+            updatePreview(previewLarge.src && previewLarge.src !== '' ? previewLarge.src : null);
+        })();
+    </script>
+}
