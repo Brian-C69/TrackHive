@@ -23,13 +23,15 @@ public sealed class PayrollPdfGenerator
 
                 page.Header().Element(header => BuildPayslipHeader(header, data));
                 page.Content().Element(content => BuildPayslipContent(content, data));
-                page.Footer().AlignCenter().Text(text =>
-                {
-                    text.Span($"Generated on {FormatDate(data.GeneratedAt)} · Page ");
-                    text.CurrentPageNumber();
-                    text.Span(" of ");
-                    text.TotalPages();
-                }).FontSize(9).FontColor(Colors.Grey.Medium);
+                page.Footer().AlignCenter()
+                    .DefaultTextStyle(style => style.FontSize(9).FontColor(Colors.Grey.Medium))
+                    .Text(text =>
+                    {
+                        text.Span($"Generated on {FormatDate(data.GeneratedAt)} · Page ");
+                        text.CurrentPageNumber();
+                        text.Span(" of ");
+                        text.TotalPages();
+                    });
             });
         });
 
@@ -48,13 +50,15 @@ public sealed class PayrollPdfGenerator
 
                 page.Header().Element(header => BuildReportHeader(header, data));
                 page.Content().Element(content => BuildReportContent(content, data));
-                page.Footer().AlignCenter().Text(text =>
-                {
-                    text.Span($"Generated on {FormatDate(data.GeneratedAt)} · Page ");
-                    text.CurrentPageNumber();
-                    text.Span(" of ");
-                    text.TotalPages();
-                }).FontSize(9).FontColor(Colors.Grey.Medium);
+                page.Footer().AlignCenter()
+                    .DefaultTextStyle(style => style.FontSize(9).FontColor(Colors.Grey.Medium))
+                    .Text(text =>
+                    {
+                        text.Span($"Generated on {FormatDate(data.GeneratedAt)} · Page ");
+                        text.CurrentPageNumber();
+                        text.Span(" of ");
+                        text.TotalPages();
+                    });
             });
         });
 
@@ -204,10 +208,10 @@ public sealed class PayrollPdfGenerator
 
                     section.Item().Text(text =>
                     {
-                        text.Span("Gross").FontColor(Colors.Grey.Darken1);
-                        text.Span($": {FormatCurrency(data.GrossPay)}");
-                        text.Line($"Deductions: {FormatCurrency(data.Deductions)}");
-                    }).FontSize(10);
+                        text.Span("Gross").FontColor(Colors.Grey.Darken1).FontSize(10);
+                        text.Span($": {FormatCurrency(data.GrossPay)}").FontSize(10);
+                        text.Line($"Deductions: {FormatCurrency(data.Deductions)}").FontSize(10);
+                    });
                 });
             });
         });
