@@ -19,6 +19,18 @@ public sealed class AppDbContext : DbContext
     {
 
 
+        modelBuilder.Entity<AppUser>()
+            .Property(u => u.BirthDate)
+            .HasColumnType("date");
+
+        modelBuilder.Entity<AppUser>()
+            .Property(u => u.About)
+            .HasMaxLength(1024);
+
+        modelBuilder.Entity<AppUser>()
+            .Property(u => u.ProfileImagePath)
+            .HasMaxLength(256);
+
         modelBuilder.Entity<PasswordReset>()
             .HasIndex(p => p.Token)
             .IsUnique();

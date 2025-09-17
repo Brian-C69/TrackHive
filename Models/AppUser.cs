@@ -40,4 +40,23 @@ public sealed class AppUser
     [Column(TypeName = "decimal(18,2)")]
     [Range(0, 1_000_000, ErrorMessage = "Monthly salary must be positive.")]
     public decimal MonthlySalary { get; set; }
+
+    [DataType(DataType.Date)]
+    public DateTime? BirthDate { get; set; }
+
+    [Phone]
+    [StringLength(32)]
+    public string? PhoneNumber { get; set; }
+
+    [StringLength(200)]
+    public string? JobTitle { get; set; }
+
+    [StringLength(256)]
+    public string? Address { get; set; }
+
+    [StringLength(1024)]
+    public string? About { get; set; }
+
+    [StringLength(256)]
+    public string? ProfileImagePath { get; set; }
 }
