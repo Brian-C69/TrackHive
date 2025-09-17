@@ -10,6 +10,10 @@ public sealed class InviteEmployeeViewModel
     [Required, EmailAddress]
     public string Email { get; set; } = string.Empty;
 
+    [Range(0, 1_000_000, ErrorMessage = "Monthly salary must be positive.")]
+    [Display(Name = "Monthly salary (USD)")]
+    public decimal MonthlySalary { get; set; }
+
     public string? SuccessMessage { get; set; }
     public string? ErrorMessage { get; set; }
 }

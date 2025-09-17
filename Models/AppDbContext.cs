@@ -12,6 +12,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<AttendanceRecord> AttendanceRecords => Set<AttendanceRecord>();
     public DbSet<LeaveRequest> LeaveRequests => Set<LeaveRequest>();
     public DbSet<LeaveBalance> LeaveBalances => Set<LeaveBalance>();
+    public DbSet<PayrollRecord> PayrollRecords => Set<PayrollRecord>();
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -68,5 +69,15 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<LeaveRequest>()
             .Property(l => l.EndDate)
             .HasColumnType("date");
+
+        modelBuilder.Entity<PayrollRecord>()
+            .HasIndex(p => new { p.UserId, p.Year, p.Month })
+            .IsUnique();
+
+        modelBuilder.Entity<PayrollRecord>()
+            .HasOne(p => p.User)
+            .WithMany()
+            .HasForeignKey(p => p.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

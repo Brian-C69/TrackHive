@@ -1,0 +1,254 @@
+@model TrackHive.Models.PayrollIndexViewModel
+@{
+    ViewData["Title"] = "Payroll Calculator";
+    Layout = "~/Views/Shared/_Layout.App.cshtml";
+
+    string FormatHours(decimal value) => string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:N2}", value);
+    string FormatDays(int value) => value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+
+<div class="row g-4">
+    <div class="col-12 col-xl-7">
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div>
+                        <h1 class="h4 mb-1">Integrated payroll calculator</h1>
+                        <p class="text-secondary mb-0">Generate accurate salary slips from attendance, overtime, and deduction inputs.</p>
+                    </div>
+                </div>
+
+                @if (!Model.HasEmployees)
+                {
+                    <div class="alert alert-info mb-0" role="alert">
+                        Invite employees first to start calculating payroll.
+                    </div>
+                }
+                else
+                {
+                    if (!string.IsNullOrWhiteSpace(Model.AlertMessage))
+                    {
+                        <div class="alert alert-@Model.AlertType" role="alert">@Model.AlertMessage</div>
+                    }
+
+                    <form asp-action="Calculate" asp-controller="Payroll" method="post" class="row g-3">
+                        @Html.AntiForgeryToken()
+                        <div class="col-12">
+                            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                        </div>
+
+                        <div class="col-12 col-md-8">
+                            <label asp-for="Form.SelectedEmployeeId" class="form-label">Employee</label>
+                            <select asp-for="Form.SelectedEmployeeId" class="form-select">
+                                <option value="">Select employee…</option>
+                                @foreach (var employee in Model.Employees)
+                                {
+                                    var salaryInfo = employee.MonthlySalary > 0
+                                        ? $" (${employee.MonthlySalary:N2}/month)"
+                                        : string.Empty;
+                                    <option value="@employee.Id" @(Model.Form.SelectedEmployeeId == employee.Id ? "selected" : null)>@employee.Name@salaryInfo</option>
+                                }
+                            </select>
+                            <span asp-validation-for="Form.SelectedEmployeeId" class="text-danger"></span>
+                        </div>
+
+                        <div class="col-6 col-md-2">
+                            <label asp-for="Form.Month" class="form-label">Month</label>
+                            <input asp-for="Form.Month" class="form-control" type="number" min="1" max="12" />
+                            <span asp-validation-for="Form.Month" class="text-danger"></span>
+                        </div>
+
+                        <div class="col-6 col-md-2">
+                            <label asp-for="Form.Year" class="form-label">Year</label>
+                            <input asp-for="Form.Year" class="form-control" type="number" min="2000" max="2100" />
+                            <span asp-validation-for="Form.Year" class="text-danger"></span>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label asp-for="Form.ManualDeductions" class="form-label">Manual deductions</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input asp-for="Form.ManualDeductions" class="form-control" inputmode="decimal" />
+                            </div>
+                            <span asp-validation-for="Form.ManualDeductions" class="text-danger"></span>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label asp-for="Form.AdditionalOvertimeHours" class="form-label">Additional overtime hours</label>
+                            <input asp-for="Form.AdditionalOvertimeHours" class="form-control" inputmode="decimal" />
+                            <span asp-validation-for="Form.AdditionalOvertimeHours" class="text-danger"></span>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input asp-for="Form.SaveRecord" class="form-check-input" />
+                                <label asp-for="Form.SaveRecord" class="form-check-label">Store this payroll run</label>
+                            </div>
+                        </div>
+
+                        <div class="col-12 d-grid d-sm-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Calculate payroll</button>
+                        </div>
+                    </form>
+                }
+            </div>
+        </div>
+
+        @if (Model.Result is TrackHive.Models.PayrollCalculationResult result)
+        {
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h2 class="h5 mb-1">@result.EmployeeName</h2>
+                            <div class="text-secondary">@result.PeriodLabel</div>
+                        </div>
+                        <div class="text-end">
+                            <div class="fw-semibold">Net pay</div>
+                            <div class="display-6 fw-bold text-success">@result.FormattedNetPay</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-6 col-md-3">
+                            <div class="text-secondary small">Monthly salary</div>
+                            <div class="fw-semibold">@result.FormattedMonthlySalary</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="text-secondary small">Working days</div>
+                            <div class="fw-semibold">@FormatDays(result.WorkingDays)</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="text-secondary small">Present days</div>
+                            <div class="fw-semibold">@FormatDays(result.PresentDays)</div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="text-secondary small">Absent days</div>
+                            <div class="fw-semibold">@FormatDays(result.AbsentDays)</div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive mb-4">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Metric</th>
+                                    <th scope="col" class="text-end">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Standard hours</td>
+                                    <td class="text-end">@FormatHours(result.StandardHours)</td>
+                                </tr>
+                                <tr>
+                                    <td>Worked hours</td>
+                                    <td class="text-end">@FormatHours(result.WorkedHours)</td>
+                                </tr>
+                                <tr>
+                                    <td>Hourly rate</td>
+                                    <td class="text-end">@result.FormattedHourlyRate</td>
+                                </tr>
+                                <tr>
+                                    <td>Automatic overtime (hrs)</td>
+                                    <td class="text-end">@FormatHours(result.AutoOvertimeHours)</td>
+                                </tr>
+                                <tr>
+                                    <td>Manual overtime (hrs)</td>
+                                    <td class="text-end">@FormatHours(result.ManualOvertimeHours)</td>
+                                </tr>
+                                <tr>
+                                    <td>Total overtime (hrs)</td>
+                                    <td class="text-end">@FormatHours(result.TotalOvertimeHours)</td>
+                                </tr>
+                                <tr>
+                                    <td>Overtime multiplier</td>
+                                    <td class="text-end">@result.OvertimeMultiplier.ToString("0.##")x</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="row g-4">
+                        <div class="col-12 col-md-4">
+                            <div class="border rounded p-3 h-100">
+                                <div class="text-secondary small">Attendance pay</div>
+                                <div class="h5 mb-0">@result.FormattedAttendancePay</div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div class="border rounded p-3 h-100">
+                                <div class="text-secondary small">Overtime pay</div>
+                                <div class="h5 mb-0">@result.FormattedOvertimePay</div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div class="border rounded p-3 h-100">
+                                <div class="text-secondary small">Deductions</div>
+                                <div class="h5 mb-0 text-danger">@result.FormattedDeductions</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4" />
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-secondary small">Gross pay</div>
+                            <div class="h5 mb-0">@result.FormattedGrossPay</div>
+                        </div>
+                        <div>
+                            <div class="text-secondary small">Net pay</div>
+                            <div class="h4 mb-0 text-success">@result.FormattedNetPay</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="col-12 col-xl-5">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="h6 mb-3">Recent payroll history</h2>
+                @if (Model.History.Count == 0)
+                {
+                    <p class="text-secondary mb-0">No payroll records saved yet.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Period</th>
+                                    <th scope="col" class="text-end">Net pay</th>
+                                    <th scope="col" class="text-end">Gross</th>
+                                    <th scope="col" class="text-end">Deducted</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var record in Model.History)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@record.PeriodLabel</div>
+                                            <div class="text-secondary small">@record.CalculatedAt.ToLocalTime():g</div>
+                                        </td>
+                                        <td class="text-end">@string.Format("${0:N2}", record.NetPay)</td>
+                                        <td class="text-end text-secondary">@string.Format("${0:N2}", record.GrossPay)</td>
+                                        <td class="text-end text-danger">@string.Format("${0:N2}", record.Deductions)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
