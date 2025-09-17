@@ -37,6 +37,13 @@
                     </div>
 
                     <div class="mb-4">
+                        <label asp-for="Language" class="form-label fw-semibold"></label>
+                        <p class="text-secondary small mb-2">Choose the language used across the TrackHive interface.</p>
+                        <select class="form-select" asp-for="Language" asp-items="Model.Languages"></select>
+                        <span class="text-danger small" asp-validation-for="Language"></span>
+                    </div>
+
+                    <div class="mb-4">
                         <label class="form-label fw-semibold">Navigation menu order</label>
                         <p class="text-secondary small mb-3">Use the arrows to arrange items in the sidebar menu.</p>
 

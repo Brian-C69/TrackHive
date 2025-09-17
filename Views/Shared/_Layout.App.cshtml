@@ -1,7 +1,9 @@
-@{
+@{ 
     var title = ViewData["Title"] as string ?? "TrackHive";
     var themeClaim = User?.FindFirstValue(UserClaimTypes.ThemePreference) ?? "light";
     var theme = string.Equals(themeClaim, "dark", System.StringComparison.OrdinalIgnoreCase) ? "dark" : "light";
+    var languageClaim = User?.FindFirstValue(UserClaimTypes.LanguagePreference) ?? LanguagePreferences.DefaultLanguage;
+    var language = LanguagePreferences.Normalize(languageClaim);
     var navOrderClaim = User?.FindFirstValue(UserClaimTypes.NavigationOrder);
     var navLinks = new List<NavigationLink>();
 
@@ -12,7 +14,7 @@
     }
 }
 <!doctype html>
-<html lang="en" data-bs-theme="@theme">
+<html lang="@language" data-language="@language" data-bs-theme="@theme">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

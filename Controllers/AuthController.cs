@@ -293,6 +293,7 @@ public sealed class AuthController : Controller
         var theme = string.Equals(user.ThemePreference, "dark", StringComparison.OrdinalIgnoreCase)
             ? "dark"
             : "light";
+        var language = LanguagePreferences.Normalize(user.LanguagePreference);
         var navOrder = user.NavigationOrder ?? string.Empty;
 
         var claims = new List<System.Security.Claims.Claim>
@@ -302,7 +303,8 @@ public sealed class AuthController : Controller
             new(System.Security.Claims.ClaimTypes.Email, user.Email),
             new(System.Security.Claims.ClaimTypes.Role, user.Role.ToString()),
             new(UserClaimTypes.OrganizationId, user.OrganizationId.ToString()),
-            new(UserClaimTypes.ThemePreference, theme)
+            new(UserClaimTypes.ThemePreference, theme),
+            new(UserClaimTypes.LanguagePreference, language)
         };
 
         if (!string.IsNullOrWhiteSpace(navOrder))

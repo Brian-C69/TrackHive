@@ -39,6 +39,10 @@ public sealed class AppUser
     [StringLength(20)]
     public string ThemePreference { get; set; } = "light";
 
+    [Required]
+    [StringLength(10)]
+    public string LanguagePreference { get; set; } = "en";
+
     [StringLength(256)]
     public string? NavigationOrder { get; set; }
 
