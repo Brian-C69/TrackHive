@@ -180,7 +180,7 @@
                     <p class="text-secondary small">Pending requests are deducted from your available balance.</p>
                 }
 
-                <form asp-action="ApplyLeave" method="post" class="row g-3 mt-1">
+                <form asp-action="ApplyLeave" method="post" class="row g-3 mt-1" data-leave-application-form>
                     @Html.AntiForgeryToken()
                     <div class="col-sm-6">
                         <label asp-for="LeaveApplication.StartDate" class="form-label">Start</label>
@@ -245,7 +245,11 @@
                             <tbody>
                                 @foreach (var request in Model.LeaveRequests)
                                 {
-                                    <tr>
+                                    <tr data-leave-request-id="@request.Id"
+                                        data-leave-request-status="@request.Status"
+                                        data-leave-request-range="@FormatDateRange(request.StartDate, request.EndDate)"
+                                        data-leave-request-type="@LeaveTypeLabel(request.Type)"
+                                        data-leave-request-days="@request.TotalDays">
                                         <td>
                                             <div>@FormatDateRange(request.StartDate, request.EndDate)</div>
                                             @if (!string.IsNullOrWhiteSpace(request.Reason))
@@ -385,5 +389,6 @@
 
 @section Scripts {
     <script src="~/js/leave-documents.js"></script>
+    <script src="~/js/leave-dashboard.js"></script>
 }
 
