@@ -123,6 +123,14 @@
                         <input asp-for="Invite.Email" class="form-control" />
                         <span asp-validation-for="Invite.Email" class="text-danger"></span>
                     </div>
+                    <div class="col-md-6">
+                        <label asp-for="Invite.MonthlySalary" class="form-label"></label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input asp-for="Invite.MonthlySalary" class="form-control" inputmode="decimal" />
+                        </div>
+                        <span asp-validation-for="Invite.MonthlySalary" class="text-danger"></span>
+                    </div>
                     <div class="col-12 d-grid d-sm-flex gap-2">
                         <button type="submit" class="btn btn-primary">Send Invite</button>
                     </div>

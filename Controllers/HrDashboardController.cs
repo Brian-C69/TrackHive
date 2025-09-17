@@ -68,7 +68,8 @@ public sealed class HrDashboardController : Controller
             Role = RoleType.Employee,
             OrganizationId = org.Id,
             MustChangePassword = true,
-            IsActive = true
+            IsActive = true,
+            MonthlySalary = model.MonthlySalary
         };
 
         _db.Users.Add(employee);
