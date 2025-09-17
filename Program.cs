@@ -3,9 +3,13 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using QuestPDF.Infrastructure;
 using TrackHive.Models;
+using TrackHive.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+Settings.License = LicenseType.Community;
 
 // MVC + global MustChangePassword filter
 builder.Services.AddControllersWithViews(options =>
@@ -32,6 +36,7 @@ builder.Services.AddAuthorization();
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
 builder.Services.AddTransient<EmailService>();
 builder.Services.AddScoped<MustChangePasswordFilter>();
+builder.Services.AddSingleton<PayrollPdfGenerator>();
 
 var app = builder.Build();
 

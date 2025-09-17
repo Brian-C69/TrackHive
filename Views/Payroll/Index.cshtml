@@ -1,10 +1,14 @@
+@using System.Linq
 @model TrackHive.Models.PayrollIndexViewModel
-@{
+@{ 
     ViewData["Title"] = "Payroll Calculator";
     Layout = "~/Views/Shared/_Layout.App.cshtml";
 
     string FormatHours(decimal value) => string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:N2}", value);
     string FormatDays(int value) => value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    var invariant = System.Globalization.CultureInfo.InvariantCulture;
+    bool HasSavedRecord(TrackHive.Models.PayrollCalculationResult value) =>
+        Model.History.Any(h => h.Year == value.Year && h.Month == value.Month);
 }
 
 <div class="row g-4">
@@ -128,6 +132,22 @@
                         </div>
                     </div>
 
+                    @{ var hasSavedRecord = HasSavedRecord(result); }
+                    <div class="d-flex flex-wrap gap-2 align-items-center mb-4">
+                        <form asp-action="DownloadPayslip" asp-controller="Payroll" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="SelectedEmployeeId" value="@result.EmployeeId" />
+                            <input type="hidden" name="Year" value="@Model.Form.Year" />
+                            <input type="hidden" name="Month" value="@Model.Form.Month" />
+                            <input type="hidden" name="ManualDeductions" value="@Model.Form.ManualDeductions.ToString(invariant)" />
+                            <input type="hidden" name="AdditionalOvertimeHours" value="@Model.Form.AdditionalOvertimeHours.ToString(invariant)" />
+                            <button type="submit" class="btn btn-outline-primary">Download payslip (PDF)</button>
+                        </form>
+                        <span class="text-secondary small">
+                            @(hasSavedRecord ? "Uses the stored payroll record for this period." : "Exports the current calculation if no saved record exists.")
+                        </span>
+                    </div>
+
                     <div class="table-responsive mb-4">
                         <table class="table table-sm align-middle">
                             <thead>
@@ -210,7 +230,14 @@
     <div class="col-12 col-xl-5">
         <div class="card shadow-sm">
             <div class="card-body p-4">
-                <h2 class="h6 mb-3">Recent payroll history</h2>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h6 mb-0">Recent payroll history</h2>
+                    <a class="btn btn-sm btn-outline-secondary"
+                       asp-action="DownloadReport"
+                       asp-controller="Payroll"
+                       asp-route-year="@Model.Form.Year"
+                       asp-route-month="@Model.Form.Month">Export report (PDF)</a>
+                </div>
                 @if (Model.History.Count == 0)
                 {
                     <p class="text-secondary mb-0">No payroll records saved yet.</p>
@@ -225,6 +252,7 @@
                                     <th scope="col" class="text-end">Net pay</th>
                                     <th scope="col" class="text-end">Gross</th>
                                     <th scope="col" class="text-end">Deducted</th>
+                                    <th scope="col" class="text-end">Payslip</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -238,6 +266,21 @@
                                         <td class="text-end">@string.Format("${0:N2}", record.NetPay)</td>
                                         <td class="text-end text-secondary">@string.Format("${0:N2}", record.GrossPay)</td>
                                         <td class="text-end text-danger">@string.Format("${0:N2}", record.Deductions)</td>
+                                        <td class="text-end">
+                                            @if (Model.Form.SelectedEmployeeId.HasValue)
+                                            {
+                                                <a class="btn btn-sm btn-outline-secondary"
+                                                   asp-action="DownloadPayslip"
+                                                   asp-controller="Payroll"
+                                                   asp-route-employeeId="@Model.Form.SelectedEmployeeId"
+                                                   asp-route-year="@record.Year"
+                                                   asp-route-month="@record.Month">Payslip</a>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-secondary">—</span>
+                                            }
+                                        </td>
                                     </tr>
                                 }
                             </tbody>
