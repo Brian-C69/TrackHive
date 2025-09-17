@@ -46,7 +46,7 @@
                                     var salaryInfo = employee.MonthlySalary > 0
                                         ? $" (${employee.MonthlySalary:N2}/month)"
                                         : string.Empty;
-                                    <option value="@employee.Id" @(Model.Form.SelectedEmployeeId == employee.Id ? "selected" : null)>@employee.Name@salaryInfo</option>
+                                    <option value="@employee.Id" selected="@(Model.Form.SelectedEmployeeId == employee.Id ? "selected" : null)">@employee.Name@salaryInfo</option>
                                 }
                             </select>
                             <span asp-validation-for="Form.SelectedEmployeeId" class="text-danger"></span>
@@ -249,6 +249,4 @@
     </div>
 </div>
 
-@section Scripts {
-    <partial name="_ValidationScriptsPartial" />
-}
+
