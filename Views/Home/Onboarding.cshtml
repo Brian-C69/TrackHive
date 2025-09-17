@@ -21,7 +21,7 @@
                         <select class="form-select" id="onboardingLanguage">
                             @foreach (var option in LanguagePreferences.SupportedLanguages)
                             {
-                                <option value="@option.Value" @(option.Value == currentLanguage ? "selected" : null)>@option.Label</option>
+                                <option value="@option.Value" selected="@(option.Value == currentLanguage ? "selected" : null)">@option.Label</option>
                             }
                         </select>
                     </div>
