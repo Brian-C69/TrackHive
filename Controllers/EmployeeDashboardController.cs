@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +10,9 @@ namespace TrackHive.Controllers;
 public sealed class EmployeeDashboardController : Controller
 {
     private readonly AppDbContext _db;
+    private const string LeaveMessageKey = "LeaveMessage";
+    private const string LeaveErrorKey   = "LeaveError";
+
     public EmployeeDashboardController(AppDbContext db) => _db = db;
 
     [HttpGet]
@@ -36,6 +39,23 @@ public sealed class EmployeeDashboardController : Controller
             .Take(14)
             .ToListAsync();
 
+        // --- Leave: balance + requests
+        var leaveBalance = await _db.LeaveBalances
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.UserId == id);
+
+        var leaveRequests = await _db.LeaveRequests
+            .AsNoTracking()
+            .Where(r => r.UserId == id)
+            .Include(r => r.ReviewedBy)
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(20)
+            .ToListAsync();
+
+        var pendingLeaveDays = leaveRequests
+            .Where(r => r.Status == LeaveRequestStatus.Pending)
+            .Sum(r => r.TotalDays);
+
         var viewModel = new EmployeeAttendanceViewModel
         {
             OrganizationName = org?.Name ?? "Organization",
@@ -56,8 +76,35 @@ public sealed class EmployeeDashboardController : Controller
                     CheckOutTime = r.CheckOutTime
                 })
                 .ToList(),
-            CanCheckIn = todayRecord is null || !todayRecord.CheckInTime.HasValue,
-            CanCheckOut = todayRecord is not null && todayRecord.CheckInTime.HasValue && !todayRecord.CheckOutTime.HasValue
+            CanCheckIn  = todayRecord is null || !todayRecord.CheckInTime.HasValue,
+            CanCheckOut = todayRecord is not null && todayRecord.CheckInTime.HasValue && !todayRecord.CheckOutTime.HasValue,
+
+            // --- Leave section for the dashboard
+            LeaveBalance = new LeaveBalanceViewModel
+            {
+                AnnualEntitlement = leaveBalance?.AnnualEntitlement ?? LeaveBalance.DefaultAnnualEntitlement,
+                UsedDays          = leaveBalance?.UsedDays ?? 0,
+                PendingDays       = pendingLeaveDays
+            },
+            LeaveRequests = leaveRequests
+                .Select(r => new LeaveRequestListItemViewModel
+                {
+                    Id            = r.Id,
+                    StartDate     = r.StartDate,
+                    EndDate       = r.EndDate,
+                    TotalDays     = r.TotalDays,
+                    Status        = r.Status,
+                    Reason        = r.Reason,
+                    CreatedAt     = r.CreatedAt,
+                    ReviewedAt    = r.ReviewedAt,
+                    ReviewedByName= r.ReviewedBy?.Name
+                })
+                .ToList(),
+            LeaveApplication = new ApplyLeaveViewModel
+            {
+                StartDate = today,
+                EndDate   = today
+            }
         };
 
         return View(viewModel);
@@ -71,7 +118,7 @@ public sealed class EmployeeDashboardController : Controller
         if (!int.TryParse(idStr, out var id)) return RedirectToAction("Login", "Auth");
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var now = DateTimeOffset.UtcNow;
+        var now   = DateTimeOffset.UtcNow;
 
         var record = await _db.AttendanceRecords.FirstOrDefaultAsync(a => a.UserId == id && a.Date == today);
 
@@ -109,6 +156,88 @@ public sealed class EmployeeDashboardController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    // --- Leave application
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApplyLeave(ApplyLeaveViewModel model)
+    {
+        var idStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(idStr, out var id)) return RedirectToAction("Login", "Auth");
+
+        if (model.StartDate is null || model.EndDate is null)
+        {
+            TempData[LeaveErrorKey] = "Start and end dates are required.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var start = model.StartDate.Value;
+        var end   = model.EndDate.Value;
+
+        if (end < start)
+        {
+            TempData[LeaveErrorKey] = "End date cannot be before the start date.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var totalDays = (end.DayNumber - start.DayNumber) + 1;
+        if (totalDays <= 0)
+        {
+            TempData[LeaveErrorKey] = "The selected range is invalid.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var balance = await _db.LeaveBalances.FirstOrDefaultAsync(l => l.UserId == id);
+        if (balance is null)
+        {
+            balance = new LeaveBalance
+            {
+                UserId = id,
+                AnnualEntitlement = LeaveBalance.DefaultAnnualEntitlement,
+                UsedDays = 0,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            _db.LeaveBalances.Add(balance);
+        }
+
+        var pendingDays = await _db.LeaveRequests
+            .Where(r => r.UserId == id && r.Status == LeaveRequestStatus.Pending)
+            .SumAsync(r => r.TotalDays);
+
+        var available = balance.AnnualEntitlement - balance.UsedDays - pendingDays;
+        if (available < totalDays)
+        {
+            TempData[LeaveErrorKey] = $"You only have {Math.Max(available, 0)} day(s) of leave remaining.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        balance.UpdatedAt = DateTimeOffset.UtcNow;
+
+        var request = new LeaveRequest
+        {
+            UserId    = id,
+            StartDate = start,
+            EndDate   = end,
+            TotalDays = totalDays,
+            Reason    = string.IsNullOrWhiteSpace(model.Reason) ? null : model.Reason.Trim(),
+            Status    = LeaveRequestStatus.Pending,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        _db.LeaveRequests.Add(request);
+
+        try
+        {
+            await _db.SaveChangesAsync();
+            TempData[LeaveMessageKey] = $"Leave request submitted for {totalDays} day(s).";
+        }
+        catch (DbUpdateException)
+        {
+            TempData[LeaveErrorKey] = "We couldn't submit your leave request. Please try again.";
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CheckOut()
@@ -117,7 +246,7 @@ public sealed class EmployeeDashboardController : Controller
         if (!int.TryParse(idStr, out var id)) return RedirectToAction("Login", "Auth");
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var now = DateTimeOffset.UtcNow;
+        var now   = DateTimeOffset.UtcNow;
 
         var record = await _db.AttendanceRecords.FirstOrDefaultAsync(a => a.UserId == id && a.Date == today);
 
