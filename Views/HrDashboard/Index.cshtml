@@ -1,8 +1,14 @@
+@using System.Text.Json
 @model TrackHive.Models.HrDashboardViewModel
 @{
     ViewData["Title"] = "HR Dashboard";
     Layout = "~/Views/Shared/_Layout.App.cshtml";
     var orgName = Model.OrganizationName;
+    var metrics = Model.Metrics;
+    var metricsJson = JsonSerializer.Serialize(metrics, new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    });
     var certificateMessage = TempData["CertificateActionMessage"] as string;
     var certificateError = TempData["CertificateActionError"] as string;
     string FormatDate(DateOnly value) => value.ToString("MMM d, yyyy");
@@ -30,6 +36,87 @@
             <div class="card-body p-4">
                 <h1 class="h5 mb-2">Welcome, HR</h1>
                 <div class="text-secondary">Organization: <strong>@orgName</strong></div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4" id="hrMetricsCard">
+            <div class="card-body p-4">
+                <div class="d-flex flex-column flex-md-row gap-3 align-items-md-center mb-4">
+                    <div>
+                        <h2 class="h5 mb-1">Organization metrics</h2>
+                        <div class="text-secondary small">Leave performance overview for the past six months.</div>
+                    </div>
+                    <div class="ms-md-auto">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="exportMetricsBtn">
+                            <i class="bi bi-download me-1" aria-hidden="true"></i>
+                            <span>Export as PDF</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 mb-4">
+                    <div class="col">
+                        <div class="border rounded-3 p-3 h-100">
+                            <div class="text-secondary text-uppercase small">Total employees</div>
+                            <div class="fs-3 fw-semibold mb-0">@metrics.TotalEmployees</div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="border rounded-3 p-3 h-100">
+                            <div class="text-secondary text-uppercase small">Pending approvals</div>
+                            <div class="fs-3 fw-semibold mb-0">@metrics.PendingLeaveApprovals</div>
+                            <div class="text-secondary small">Awaiting HR decision</div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="border rounded-3 p-3 h-100">
+                            <div class="text-secondary text-uppercase small">Certificates to review</div>
+                            <div class="fs-3 fw-semibold mb-0">@metrics.PendingCertificateReviews</div>
+                            <div class="text-secondary small">Employee documents uploaded</div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="border rounded-3 p-3 h-100">
+                            <div class="text-secondary text-uppercase small">Leaves reviewed</div>
+                            <div class="fs-3 fw-semibold mb-0">@metrics.LeavesReviewedThisMonth</div>
+                            <div class="text-secondary small">Approved or rejected this month</div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="border rounded-3 p-3 h-100 @(metrics.AwaitingEmployeeCertificates > 0 ? "border-warning-subtle bg-warning-subtle" : string.Empty)">
+                            <div class="text-secondary text-uppercase small">Waiting on certificates</div>
+                            <div class="fs-3 fw-semibold mb-0">@metrics.AwaitingEmployeeCertificates</div>
+                            <div class="text-secondary small">Approved leave pending documents</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h3 class="h6 mb-0">Leave decisions by month</h3>
+                        <span class="text-secondary small">Past six months</span>
+                    </div>
+                    <div class="ratio ratio-21x9 bg-body-tertiary rounded-3">
+                        <canvas id="leaveTrendChart" role="img" aria-label="Line chart showing leave decisions by month"></canvas>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h3 class="h6 mb-0">Leave type distribution</h3>
+                        <span class="text-secondary small">All recorded requests</span>
+                    </div>
+                    @if (metrics.LeaveTypeBreakdown.Count == 0)
+                    {
+                        <p class="text-secondary small mb-0">No leave requests have been recorded yet.</p>
+                    }
+                    else
+                    {
+                        <div class="ratio ratio-1x1 bg-body-tertiary rounded-3">
+                            <canvas id="leaveTypeChart" role="img" aria-label="Doughnut chart showing leave type distribution"></canvas>
+                        </div>
+                    }
+                </div>
             </div>
         </div>
 
@@ -331,4 +418,181 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" crossorigin="anonymous"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const metrics = @Html.Raw(metricsJson);
+            const metricsCard = document.getElementById('hrMetricsCard');
+
+            if (!metricsCard) {
+                return;
+            }
+
+            const trendCanvas = metricsCard.querySelector('#leaveTrendChart');
+            if (trendCanvas && window.Chart && Array.isArray(metrics.leaveTrends)) {
+                const labels = metrics.leaveTrends.map(trend => trend.monthLabel);
+                const pendingData = metrics.leaveTrends.map(trend => trend.pending);
+                const approvedData = metrics.leaveTrends.map(trend => trend.approved);
+                const rejectedData = metrics.leaveTrends.map(trend => trend.rejected);
+
+                new window.Chart(trendCanvas, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                label: 'Pending',
+                                data: pendingData,
+                                tension: 0.35,
+                                borderColor: '#f59f00',
+                                backgroundColor: 'rgba(245, 159, 0, 0.2)',
+                                fill: true,
+                                borderWidth: 2,
+                                pointRadius: 3
+                            },
+                            {
+                                label: 'Approved',
+                                data: approvedData,
+                                tension: 0.35,
+                                borderColor: '#198754',
+                                backgroundColor: 'rgba(25, 135, 84, 0.15)',
+                                fill: true,
+                                borderWidth: 2,
+                                pointRadius: 3
+                            },
+                            {
+                                label: 'Rejected',
+                                data: rejectedData,
+                                tension: 0.35,
+                                borderColor: '#dc3545',
+                                backgroundColor: 'rgba(220, 53, 69, 0.15)',
+                                fill: true,
+                                borderWidth: 2,
+                                pointRadius: 3
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label(context) {
+                                        return `${context.dataset.label}: ${context.parsed.y}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    precision: 0
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            const typeCanvas = metricsCard.querySelector('#leaveTypeChart');
+            if (typeCanvas && window.Chart && Array.isArray(metrics.leaveTypeBreakdown) && metrics.leaveTypeBreakdown.length > 0) {
+                const labels = metrics.leaveTypeBreakdown.map(item => item.type);
+                const data = metrics.leaveTypeBreakdown.map(item => item.count);
+
+                new window.Chart(typeCanvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                data,
+                                backgroundColor: [
+                                    '#0d6efd',
+                                    '#20c997',
+                                    '#fd7e14',
+                                    '#6f42c1',
+                                    '#adb5bd'
+                                ],
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            }
+
+            const exportButton = document.getElementById('exportMetricsBtn');
+            if (exportButton) {
+                const defaultHtml = exportButton.innerHTML;
+
+                exportButton.addEventListener('click', async () => {
+                    if (!window.html2canvas || !window.jspdf) {
+                        window.alert('Export is currently unavailable. Please try again later.');
+                        return;
+                    }
+
+                    exportButton.disabled = true;
+                    exportButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Preparing PDF...';
+
+                    try {
+                        const canvas = await window.html2canvas(metricsCard, {
+                            scale: window.devicePixelRatio > 1 ? window.devicePixelRatio : 2,
+                            useCORS: true,
+                            backgroundColor: window.getComputedStyle(document.body).backgroundColor
+                        });
+
+                        const imgData = canvas.toDataURL('image/png');
+                        const { jsPDF } = window.jspdf;
+                        const pdf = new jsPDF('p', 'mm', 'a4');
+                        const pageWidth = pdf.internal.pageSize.getWidth();
+                        const pageHeight = pdf.internal.pageSize.getHeight();
+                        const imgProps = pdf.getImageProperties(imgData);
+
+                        const margin = 10;
+                        let pdfWidth = pageWidth - margin * 2;
+                        let pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+                        if (pdfHeight > pageHeight - margin * 2) {
+                            pdfHeight = pageHeight - margin * 2;
+                            pdfWidth = (imgProps.width * pdfHeight) / imgProps.height;
+                        }
+
+                        const offsetX = (pageWidth - pdfWidth) / 2;
+                        pdf.addImage(imgData, 'PNG', offsetX, margin, pdfWidth, pdfHeight);
+
+                        const timestamp = new Date().toISOString().slice(0, 10);
+                        pdf.save(`trackhive-hr-metrics-${timestamp}.pdf`);
+                    } catch (error) {
+                        console.error('Metrics export failed', error);
+                        window.alert('We could not export the metrics. Please try again.');
+                    } finally {
+                        exportButton.disabled = false;
+                        exportButton.innerHTML = defaultHtml;
+                    }
+                });
+            }
+        });
+    </script>
+}
 

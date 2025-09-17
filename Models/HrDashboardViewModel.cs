@@ -8,6 +8,7 @@ public sealed class HrDashboardViewModel
     public IReadOnlyList<LeaveCertificateReviewViewModel> PendingCertificateRequests { get; init; } = Array.Empty<LeaveCertificateReviewViewModel>();
     public IReadOnlyList<LeaveBalanceSummaryViewModel> LeaveSummaries { get; init; } = Array.Empty<LeaveBalanceSummaryViewModel>();
     public IReadOnlyList<DashboardNotificationViewModel> Notifications { get; init; } = Array.Empty<DashboardNotificationViewModel>();
+    public DashboardMetricsViewModel Metrics { get; init; } = new();
 }
 
 public sealed class LeaveRequestReviewViewModel
@@ -51,5 +52,30 @@ public sealed class DashboardNotificationViewModel
     public required string Message { get; init; }
     public required string Category { get; init; }
     public DateTimeOffset? CreatedAt { get; init; }
+}
+
+public sealed class DashboardMetricsViewModel
+{
+    public int TotalEmployees { get; init; }
+    public int PendingLeaveApprovals { get; init; }
+    public int PendingCertificateReviews { get; init; }
+    public int AwaitingEmployeeCertificates { get; init; }
+    public int LeavesReviewedThisMonth { get; init; }
+    public IReadOnlyList<MonthlyLeaveTrendViewModel> LeaveTrends { get; init; } = Array.Empty<MonthlyLeaveTrendViewModel>();
+    public IReadOnlyList<LeaveTypeBreakdownViewModel> LeaveTypeBreakdown { get; init; } = Array.Empty<LeaveTypeBreakdownViewModel>();
+}
+
+public sealed class MonthlyLeaveTrendViewModel
+{
+    public required string MonthLabel { get; init; }
+    public int Pending { get; init; }
+    public int Approved { get; init; }
+    public int Rejected { get; init; }
+}
+
+public sealed class LeaveTypeBreakdownViewModel
+{
+    public required string Type { get; init; }
+    public int Count { get; init; }
 }
 
