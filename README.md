@@ -101,3 +101,59 @@ Set your connection string and SMTP in `appsettings.json` (or via user secrets /
     "UseSsl": true
   }
 }
+```
+
+---
+
+## 🚀 Quick Start
+
+```bash
+# 1) Restore & build
+dotnet restore
+dotnet build
+
+# 2) Apply database migrations (optional; also applied on startup)
+dotnet ef database update
+
+# 3) Run
+dotnet run
+```
+
+The app listens on your configured ASP.NET Core URL (e.g., `https://localhost:5001`).  
+For LAN/Internet access during dev, bind Kestrel to `0.0.0.0` and open/forward the port as needed.
+
+---
+
+## 📦 Data & Storage
+
+- EF Core migrations live under `Models/*_<Timestamp>*.cs`. Create new migrations with:
+  ```bash
+  dotnet ef migrations add <Name>
+  ```
+- Uploaded avatars and medical certificates live under `wwwroot/uploads`. Ensure the process has write permissions.
+
+---
+
+## 🗂️ Project Structure
+
+```
+Controllers/    // MVC controllers per feature area
+Models/         // EF entities, view models, filters, services
+Services/       // Cross-cutting helpers (navigation, PDF generation)
+Views/          // Razor views for dashboards and forms
+wwwroot/        // Static files and upload targets
+```
+
+---
+
+## 🔮 Next Steps
+
+- Add automated tests for **leave math**, **payroll calculations**, and core workflows.
+- Add background jobs for **reminder emails** or **daily attendance summaries**.
+- Optional: use **Dev Tunnels/ngrok** for quick external testing or deploy to **Azure App Service**. 🌐
+
+---
+
+## 📜 License
+
+MIT (or your preferred license). Update this section as needed.
