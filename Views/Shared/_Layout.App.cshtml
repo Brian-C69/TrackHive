@@ -8,10 +8,13 @@
     var navLinks = new List<NavigationLink>();
 
     var roleValue = User?.FindFirstValue(System.Security.Claims.ClaimTypes.Role);
-    if (!string.IsNullOrWhiteSpace(roleValue) && Enum.TryParse<RoleType>(roleValue, out var role))
+    if (!string.IsNullOrWhiteSpace(roleValue) && Enum.TryParse(roleValue, true, out RoleType role))
     {
         navLinks = NavigationMenu.ApplyOrder(NavigationMenu.GetLinksForRole(role), navOrderClaim).ToList();
     }
+
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
 }
 <!doctype html>
 <html lang="@language" data-language="@language" data-bs-theme="@theme">
@@ -43,7 +46,9 @@
                             <div class="px-3 text-uppercase small text-secondary mt-2 mb-1">@currentSection</div>;
                         }
 
-                        <a class="nav-link d-flex align-items-center" asp-controller="@item.Controller" asp-action="@item.Action" title="@item.Label" aria-label="@item.Label">
+                        var isActive = string.Equals(item.Controller, currentController, StringComparison.OrdinalIgnoreCase)
+                            && string.Equals(item.Action, currentAction, StringComparison.OrdinalIgnoreCase);
+                        <a class="nav-link d-flex align-items-center@(isActive ? " active" : string.Empty)" asp-controller="@item.Controller" asp-action="@item.Action" title="@item.Label" aria-label="@item.Label" aria-current="@(isActive ? "page" : null)">
                             <i class="bi @item.Icon nav-link-icon" aria-hidden="true"></i>
                             <span class="nav-link-label">@item.Label</span>
                         </a>
@@ -89,9 +94,56 @@
     <script src="~/js/pwa.js"></script>
     <script>
         (function() {
-          const shell = document.getElementById('app-shell');
-          const btn = document.getElementById('sidebarToggle');
-          if (btn && shell) btn.addEventListener('click', () => shell.classList.toggle('sidebar-collapsed'));
+            const shell = document.getElementById('app-shell');
+            const btn = document.getElementById('sidebarToggle');
+            const storageKey = 'trackhive:sidebar-collapsed';
+
+            if (!shell) {
+                return;
+            }
+
+            const readState = () => {
+                try {
+                    return window.localStorage.getItem(storageKey) === '1';
+                } catch (error) {
+                    return false;
+                }
+            };
+
+            const writeState = (collapsed) => {
+                try {
+                    window.localStorage.setItem(storageKey, collapsed ? '1' : '0');
+                } catch (error) {
+                    // Ignore storage errors (e.g., private browsing)
+                }
+            };
+
+            const updateButton = (collapsed) => {
+                if (btn) {
+                    btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                }
+            };
+
+            const applyState = (collapsed) => {
+                shell.classList.toggle('sidebar-collapsed', collapsed);
+                updateButton(collapsed);
+            };
+
+            applyState(readState());
+
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    const collapsed = !shell.classList.contains('sidebar-collapsed');
+                    applyState(collapsed);
+                    writeState(collapsed);
+                });
+            }
+
+            window.addEventListener('storage', (event) => {
+                if (event.key === storageKey) {
+                    applyState(event.newValue === '1');
+                }
+            });
         })();
     </script>
     @RenderSection("Scripts", required: false)
