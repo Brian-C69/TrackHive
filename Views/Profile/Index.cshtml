@@ -1,6 +1,7 @@
 @using System.Linq
 @model TrackHive.Models.ProfileViewModel
 @{
+    Layout = "~/Views/Shared/_Layout.App.cshtml";
     ViewData["Title"] = "My profile";
     var placeholder = Url.Content("~/img/avatar-placeholder.svg");
     var previewImage = !string.IsNullOrWhiteSpace(Model.ExistingImagePath) ? Model.ExistingImagePath : placeholder;
