@@ -58,10 +58,6 @@ namespace TrackHive.Models
                     b.Property<bool>("IsLocked")
                         .HasColumnType("bit");
 
-                    b.Property<string>("NavigationOrder")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
                     b.Property<string>("JobTitle")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -76,6 +72,10 @@ namespace TrackHive.Models
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("NavigationOrder")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<int>("OrganizationId")
                         .HasColumnType("int");
@@ -93,13 +93,13 @@ namespace TrackHive.Models
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<int>("Role")
+                        .HasColumnType("int");
+
                     b.Property<string>("ThemePreference")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
-
-                    b.Property<int>("Role")
-                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
