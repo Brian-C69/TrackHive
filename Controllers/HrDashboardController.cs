@@ -229,6 +229,7 @@ public sealed class HrDashboardController : Controller
         return await _db.Users.FindAsync(id);
     }
 
+
     private async Task<HrDashboardViewModel> BuildDashboardViewModelAsync(AppUser hr, InviteEmployeeViewModel? inviteOverride)
     {
         var org = await _db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == hr.OrganizationId);
@@ -300,12 +301,133 @@ public sealed class HrDashboardController : Controller
             })
             .ToList();
 
+        var notifications = new List<DashboardNotificationViewModel>();
+        var employeeNameLookup = employees.ToDictionary(e => e.Id, e => e.Name);
+
+        if (pendingViewModels.Count > 0)
+        {
+            var oldestPending = pendingRequests.Min(r => r.CreatedAt);
+            notifications.Add(new DashboardNotificationViewModel
+            {
+                Category = "Leave",
+                Title = "Pending leave approvals",
+                Message = $"You have {pendingViewModels.Count} leave request(s) waiting for review.",
+                CreatedAt = oldestPending
+            });
+        }
+
+        if (employeeIds.Count > 0)
+        {
+            var statusHistoryCutoff = DateTimeOffset.UtcNow.AddDays(-7);
+            var recentDecisions = await _db.LeaveRequests
+                .AsNoTracking()
+                .Include(r => r.User)
+                .Where(r => employeeIds.Contains(r.UserId)
+                    && r.Status != LeaveRequestStatus.Pending
+                    && r.ReviewedAt != null
+                    && r.ReviewedAt >= statusHistoryCutoff)
+                .OrderByDescending(r => r.ReviewedAt)
+                .Take(5)
+                .ToListAsync();
+
+            foreach (var decision in recentDecisions)
+            {
+                var status = decision.Status == LeaveRequestStatus.Approved ? "approved" : "rejected";
+                var reviewedAt = decision.ReviewedAt!.Value;
+                var employeeName = decision.User?.Name ?? "Employee";
+                notifications.Add(new DashboardNotificationViewModel
+                {
+                    Category = "Leave",
+                    Title = $"{employeeName}'s leave {status}",
+                    Message = $"{employeeName}'s {decision.TotalDays} day(s) of leave were {status} on {reviewedAt.ToLocalTime():MMM d}.",
+                    CreatedAt = reviewedAt
+                });
+            }
+
+            var lateThreshold = new TimeOnly(9, 30).ToTimeSpan();
+            var attendanceWindowStart = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-6));
+            var recentAttendance = await _db.AttendanceRecords
+                .AsNoTracking()
+                .Where(a => employeeIds.Contains(a.UserId)
+                    && a.Date >= attendanceWindowStart
+                    && a.CheckInTime != null)
+                .Select(a => new { a.UserId, a.Date, a.CheckInTime })
+                .ToListAsync();
+
+            static bool IsLate(DateTimeOffset checkInLocal, TimeSpan threshold) => checkInLocal.TimeOfDay > threshold;
+
+            var lateArrivals = recentAttendance
+                .Select(a => new
+                {
+                    a.UserId,
+                    a.Date,
+                    CheckInLocal = a.CheckInTime!.Value.ToLocalTime()
+                })
+                .Where(a => IsLate(a.CheckInLocal, lateThreshold))
+                .OrderByDescending(a => a.Date)
+                .ThenByDescending(a => a.CheckInLocal)
+                .Take(5)
+                .ToList();
+
+            foreach (var record in lateArrivals)
+            {
+                if (!employeeNameLookup.TryGetValue(record.UserId, out var employeeName))
+                {
+                    employeeName = "Employee";
+                }
+
+                var checkInLocal = record.CheckInLocal.ToLocalTime();
+                notifications.Add(new DashboardNotificationViewModel
+                {
+                    Category = "Attendance",
+                    Title = "Late arrival alert",
+                    Message = $"{employeeName} checked in at {checkInLocal:t} on {record.Date:MMM d}.",
+                    CreatedAt = record.CheckInLocal
+                });
+            }
+
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var monthStart = new DateOnly(today.Year, today.Month, 1);
+            var nextMonth = monthStart.AddMonths(1);
+            var monthAttendance = await _db.AttendanceRecords
+                .AsNoTracking()
+                .Where(a => employeeIds.Contains(a.UserId)
+                    && a.Date >= monthStart
+                    && a.Date < nextMonth)
+                .Select(a => new { a.UserId, a.Date, a.CheckInTime })
+                .ToListAsync();
+
+            if (monthAttendance.Count > 0)
+            {
+                var totalCheckIns = monthAttendance.Count(a => a.CheckInTime != null);
+                var employeesActive = monthAttendance.Select(a => a.UserId).Distinct().Count();
+                var lateCount = monthAttendance
+                    .Where(a => a.CheckInTime != null)
+                    .Select(a => a.CheckInTime!.Value.ToLocalTime())
+                    .Count(local => IsLate(local, lateThreshold));
+
+                notifications.Add(new DashboardNotificationViewModel
+                {
+                    Category = "Reports",
+                    Title = $"{monthStart:MMMM yyyy} attendance summary",
+                    Message = $"{totalCheckIns} check-in(s) recorded across {employeesActive} employee(s) with {lateCount} late arrival(s).",
+                    CreatedAt = DateTimeOffset.UtcNow
+                });
+            }
+        }
+
+        var orderedNotifications = notifications
+            .OrderByDescending(n => n.CreatedAt ?? DateTimeOffset.MinValue)
+            .Take(10)
+            .ToList();
+
         return new HrDashboardViewModel
         {
             OrganizationName = org?.Name ?? "Organization",
             Invite = invite,
             PendingLeaveRequests = pendingViewModels,
-            LeaveSummaries = leaveSummaries
+            LeaveSummaries = leaveSummaries,
+            Notifications = orderedNotifications
         };
     }
 

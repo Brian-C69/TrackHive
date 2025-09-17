@@ -6,6 +6,7 @@ public sealed class HrDashboardViewModel
     public InviteEmployeeViewModel Invite { get; init; } = new();
     public IReadOnlyList<LeaveRequestReviewViewModel> PendingLeaveRequests { get; init; } = Array.Empty<LeaveRequestReviewViewModel>();
     public IReadOnlyList<LeaveBalanceSummaryViewModel> LeaveSummaries { get; init; } = Array.Empty<LeaveBalanceSummaryViewModel>();
+    public IReadOnlyList<DashboardNotificationViewModel> Notifications { get; init; } = Array.Empty<DashboardNotificationViewModel>();
 }
 
 public sealed class LeaveRequestReviewViewModel
@@ -28,5 +29,13 @@ public sealed class LeaveBalanceSummaryViewModel
     public required int UsedDays { get; init; }
     public required int PendingDays { get; init; }
     public int AvailableDays => Math.Max(0, AnnualEntitlement - UsedDays - PendingDays);
+}
+
+public sealed class DashboardNotificationViewModel
+{
+    public required string Title { get; init; }
+    public required string Message { get; init; }
+    public required string Category { get; init; }
+    public DateTimeOffset? CreatedAt { get; init; }
 }
 
