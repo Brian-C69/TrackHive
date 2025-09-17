@@ -1,6 +1,5 @@
 const CACHE_NAME = 'trackhive-static-v1';
 const OFFLINE_URLS = [
-  '/',
   '/css/site.css',
   '/js/pwa.js',
   '/js/leave-dashboard.js',
@@ -29,28 +28,49 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') {
+  const { request } = event;
+
+  if (request.method !== 'GET') {
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        return cached;
+    (async () => {
+      const acceptHeader = request.headers.get('Accept') || '';
+      if (request.mode === 'navigate' || acceptHeader.includes('text/html')) {
+        return fetch(request);
       }
 
-      return fetch(event.request)
-        .then((response) => {
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
+      const cachedResponse = await caches.match(request);
+      if (cachedResponse) {
+        return cachedResponse;
+      }
 
-          const cloned = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
-          return response;
-        })
-        .catch(() => caches.match('/'));
-    })
+      try {
+        const networkResponse = await fetch(request);
+
+        if (
+          networkResponse &&
+          networkResponse.status === 200 &&
+          networkResponse.type === 'basic'
+        ) {
+          const contentType = networkResponse.headers.get('Content-Type') || '';
+
+          if (!contentType.includes('text/html')) {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(request, networkResponse.clone());
+          }
+        }
+
+        return networkResponse;
+      } catch (error) {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+
+        throw error;
+      }
+    })()
   );
 });
 
