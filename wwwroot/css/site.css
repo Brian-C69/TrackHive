@@ -41,6 +41,12 @@ body {
     color: var(--bs-body-color);
 }
 
+.app-shell .nav-link.active {
+    background: var(--sidebar-hover);
+    color: var(--brand);
+    font-weight: 600;
+}
+
 .app-shell .nav-link-icon {
     font-size: 1.1rem;
     width: 1.5rem;
