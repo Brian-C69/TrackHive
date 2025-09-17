@@ -9,7 +9,7 @@ using TrackHive.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-Settings.License = LicenseType.Community;
+
 
 // MVC + global MustChangePassword filter
 builder.Services.AddControllersWithViews(options =>
