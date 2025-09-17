@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Linq;
 using System.Security.Claims;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +19,14 @@ public sealed class HrDashboardController : Controller
     private const string LeaveActionErrorKey   = "LeaveActionError";
     private const string CertificateActionMessageKey = "CertificateActionMessage";
     private const string CertificateActionErrorKey   = "CertificateActionError";
+    private static string FormatLeaveType(LeaveType type) => type switch
+    {
+        LeaveType.Annual    => "Annual leave",
+        LeaveType.Sick      => "Sick leave",
+        LeaveType.Emergency => "Emergency leave",
+        LeaveType.Unpaid    => "Unpaid leave",
+        _                   => "Other leave"
+    };
     public HrDashboardController(AppDbContext db, EmailService email)
     {
         _db = db;
@@ -185,6 +194,21 @@ public sealed class HrDashboardController : Controller
                 ? $"Approved {request.User.Name}'s leave ({request.TotalDays} day(s)). Awaiting medical certificate."
                 : $"Approved {request.User.Name}'s leave ({request.TotalDays} day(s)).";
             TempData[LeaveActionMessageKey] = message;
+
+            var subject = "Leave request approved";
+            var intro = "Good news! Your leave request has been approved.";
+            var additional = requiresCertificate
+                ? "Please upload your medical certificate so HR can complete the approval."
+                : null;
+
+            var (emailOk, emailError) = await SendEmployeeLeaveEmailAsync(request, subject, intro, additional);
+            if (!emailOk)
+            {
+                var errorMessage = string.IsNullOrWhiteSpace(emailError)
+                    ? "Leave approved, but the email notification could not be sent."
+                    : $"Leave approved, but the email notification could not be sent: {emailError}";
+                TempData[LeaveActionErrorKey] = errorMessage;
+            }
         }
         catch (DbUpdateException)
         {
@@ -226,6 +250,19 @@ public sealed class HrDashboardController : Controller
         {
             await _db.SaveChangesAsync();
             TempData[LeaveActionMessageKey] = $"Rejected {request.User.Name}'s leave request.";
+
+            var (emailOk, emailError) = await SendEmployeeLeaveEmailAsync(
+                request,
+                "Leave request rejected",
+                "We're sorry to let you know that your leave request was rejected.");
+
+            if (!emailOk)
+            {
+                var errorMessage = string.IsNullOrWhiteSpace(emailError)
+                    ? "Leave rejected, but the email notification could not be sent."
+                    : $"Leave rejected, but the email notification could not be sent: {emailError}";
+                TempData[LeaveActionErrorKey] = errorMessage;
+            }
         }
         catch (DbUpdateException)
         {
@@ -267,6 +304,19 @@ public sealed class HrDashboardController : Controller
         {
             await _db.SaveChangesAsync();
             TempData[CertificateActionMessageKey] = $"Approved medical certificate for {request.User.Name}.";
+
+            var (emailOk, emailError) = await SendEmployeeLeaveEmailAsync(
+                request,
+                "Medical certificate approved",
+                "Your medical certificate has been reviewed and your leave is fully approved.");
+
+            if (!emailOk)
+            {
+                var errorMessage = string.IsNullOrWhiteSpace(emailError)
+                    ? "Certificate approved, but the email notification could not be sent."
+                    : $"Certificate approved, but the email notification could not be sent: {emailError}";
+                TempData[CertificateActionErrorKey] = errorMessage;
+            }
         }
         catch (DbUpdateException)
         {
@@ -308,6 +358,20 @@ public sealed class HrDashboardController : Controller
         {
             await _db.SaveChangesAsync();
             TempData[CertificateActionMessageKey] = $"Requested a new medical certificate from {request.User.Name}.";
+
+            var (emailOk, emailError) = await SendEmployeeLeaveEmailAsync(
+                request,
+                "Medical certificate requires attention",
+                "We reviewed your medical certificate but couldn't approve it.",
+                "Please upload a new document so we can complete the approval.");
+
+            if (!emailOk)
+            {
+                var errorMessage = string.IsNullOrWhiteSpace(emailError)
+                    ? "Certificate update saved, but the email notification could not be sent."
+                    : $"Certificate update saved, but the email notification could not be sent: {emailError}";
+                TempData[CertificateActionErrorKey] = errorMessage;
+            }
         }
         catch (DbUpdateException)
         {
@@ -324,20 +388,53 @@ public sealed class HrDashboardController : Controller
         return await _db.Users.FindAsync(id);
     }
 
+    private async Task<(bool ok, string? error)> SendEmployeeLeaveEmailAsync(
+        LeaveRequest request,
+        string subject,
+        string introParagraph,
+        string? additionalParagraph = null)
+    {
+        var employee = request.User ?? await _db.Users.FindAsync(request.UserId);
+        if (employee is null || string.IsNullOrWhiteSpace(employee.Email))
+        {
+            return (false, "Employee email address could not be determined.");
+        }
+
+        var typeLabel = FormatLeaveType(request.Type);
+        var reasonHtml = string.IsNullOrWhiteSpace(request.Reason)
+            ? "<em>No reason provided.</em>"
+            : System.Net.WebUtility.HtmlEncode(request.Reason);
+
+        var builder = new StringBuilder();
+        builder.Append($"<p>Hi {System.Net.WebUtility.HtmlEncode(employee.Name)},</p>");
+        builder.Append($"<p>{introParagraph}</p>");
+
+        if (!string.IsNullOrWhiteSpace(additionalParagraph))
+        {
+            builder.Append($"<p>{additionalParagraph}</p>");
+        }
+
+        builder.Append("<p><strong>Leave details:</strong><br/>");
+        builder.Append($"Type: {System.Net.WebUtility.HtmlEncode(typeLabel)}<br/>");
+        builder.Append($"Dates: {request.StartDate:MMM d, yyyy} – {request.EndDate:MMM d, yyyy}<br/>");
+        builder.Append($"Total days: {request.TotalDays}<br/>");
+        builder.Append($"Reason: {reasonHtml}</p>");
+
+        var dashboardUrl = Url.Action("Index", "EmployeeDashboard", values: null, protocol: Request.Scheme, host: Request.Host.Value);
+        if (!string.IsNullOrWhiteSpace(dashboardUrl))
+        {
+            builder.Append($"<p>View your leave requests: <a href=\"{dashboardUrl}\">{dashboardUrl}</a></p>");
+        }
+
+        builder.Append("<p>— TrackHive</p>");
+
+        return await _email.SendAsync(employee.Email, subject, builder.ToString());
+    }
 
     private async Task<HrDashboardViewModel> BuildDashboardViewModelAsync(AppUser hr, InviteEmployeeViewModel? inviteOverride)
     {
         var org = await _db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == hr.OrganizationId);
         var invite = inviteOverride ?? new InviteEmployeeViewModel();
-
-        static string FormatLeaveType(LeaveType type) => type switch
-        {
-            LeaveType.Annual => "Annual leave",
-            LeaveType.Sick => "Sick leave",
-            LeaveType.Emergency => "Emergency leave",
-            LeaveType.Unpaid => "Unpaid leave",
-            _ => "Other leave"
-        };
 
         var employees = await _db.Users
             .AsNoTracking()

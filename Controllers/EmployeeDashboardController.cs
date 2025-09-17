@@ -1,6 +1,8 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Security.Claims;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -21,11 +23,13 @@ public sealed class EmployeeDashboardController : Controller
     private const long MaxCertificateFileBytes = 5 * 1024 * 1024; // 5 MB per file
     private static readonly string[] AllowedCertificateExtensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".pdf", ".heic", ".heif"];
     private readonly IWebHostEnvironment _environment;
+    private readonly EmailService _email;
 
-    public EmployeeDashboardController(AppDbContext db, IWebHostEnvironment environment)
+    public EmployeeDashboardController(AppDbContext db, IWebHostEnvironment environment, EmailService email)
     {
         _db = db;
         _environment = environment;
+        _email = email;
     }
 
     [HttpGet]
@@ -191,6 +195,12 @@ public sealed class EmployeeDashboardController : Controller
         var idStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!int.TryParse(idStr, out var id)) return RedirectToAction("Login", "Auth");
 
+        var employee = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id);
+        if (employee is null)
+        {
+            return RedirectToAction("Login", "Auth");
+        }
+
         if (model.StartDate is null || model.EndDate is null)
         {
             TempData[LeaveErrorKey] = "Start and end dates are required.";
@@ -263,6 +273,36 @@ public sealed class EmployeeDashboardController : Controller
         {
             await _db.SaveChangesAsync();
             TempData[LeaveMessageKey] = $"Leave request submitted for {totalDays} day(s).";
+
+            var hrError = await NotifyHrsAsync(employee.OrganizationId, hr =>
+            {
+                var subject = $"New leave request from {employee.Name}";
+                var reviewUrl = Url.Action("Index", "HrDashboard", values: null, protocol: Request.Scheme, host: Request.Host.Value);
+                var builder = new StringBuilder();
+                builder.Append($"<p>Hi {System.Net.WebUtility.HtmlEncode(hr.Name)},</p>");
+                builder.Append($"<p>{System.Net.WebUtility.HtmlEncode(employee.Name)} submitted a leave request.</p>");
+                builder.Append("<p><strong>Leave details:</strong><br/>");
+                builder.Append($"Type: {System.Net.WebUtility.HtmlEncode(FormatLeaveType(request.Type))}<br/>");
+                builder.Append($"Dates: {request.StartDate:MMM d, yyyy} – {request.EndDate:MMM d, yyyy}<br/>");
+                builder.Append($"Total days: {request.TotalDays}</p>");
+                if (!string.IsNullOrWhiteSpace(request.Reason))
+                {
+                    builder.Append($"<p><strong>Reason:</strong> {System.Net.WebUtility.HtmlEncode(request.Reason)}</p>");
+                }
+
+                if (!string.IsNullOrWhiteSpace(reviewUrl))
+                {
+                    builder.Append($"<p>Review in TrackHive: <a href=\"{reviewUrl}\">{reviewUrl}</a></p>");
+                }
+
+                builder.Append("<p>— TrackHive</p>");
+                return (subject, builder.ToString());
+            });
+
+            if (!string.IsNullOrWhiteSpace(hrError))
+            {
+                TempData[LeaveErrorKey] = $"Leave request submitted, but we couldn't send notification email(s): {hrError}";
+            }
         }
         catch (DbUpdateException)
         {
@@ -281,6 +321,7 @@ public sealed class EmployeeDashboardController : Controller
 
         var request = await _db.LeaveRequests
             .Include(r => r.Documents)
+            .Include(r => r.User)
             .FirstOrDefaultAsync(r => r.Id == requestId && r.UserId == userId);
 
         if (request is null)
@@ -349,6 +390,35 @@ public sealed class EmployeeDashboardController : Controller
         {
             await _db.SaveChangesAsync();
             TempData[CertificateMessageKey] = "Medical certificate submitted for HR review.";
+
+            if (request.User is not null)
+            {
+                var hrError = await NotifyHrsAsync(request.User.OrganizationId, hr =>
+                {
+                    var subject = $"Medical certificate from {request.User.Name}";
+                    var reviewUrl = Url.Action("Index", "HrDashboard", values: null, protocol: Request.Scheme, host: Request.Host.Value);
+                    var builder = new StringBuilder();
+                    builder.Append($"<p>Hi {System.Net.WebUtility.HtmlEncode(hr.Name)},</p>");
+                    builder.Append($"<p>{System.Net.WebUtility.HtmlEncode(request.User.Name)} uploaded a medical certificate for their leave request.</p>");
+                    builder.Append("<p><strong>Leave details:</strong><br/>");
+                    builder.Append($"Type: {System.Net.WebUtility.HtmlEncode(FormatLeaveType(request.Type))}<br/>");
+                    builder.Append($"Dates: {request.StartDate:MMM d, yyyy} – {request.EndDate:MMM d, yyyy}<br/>");
+                    builder.Append($"Total days: {request.TotalDays}</p>");
+
+                    if (!string.IsNullOrWhiteSpace(reviewUrl))
+                    {
+                        builder.Append($"<p>Review the documents: <a href=\"{reviewUrl}\">{reviewUrl}</a></p>");
+                    }
+
+                    builder.Append("<p>— TrackHive</p>");
+                    return (subject, builder.ToString());
+                });
+
+                if (!string.IsNullOrWhiteSpace(hrError))
+                {
+                    TempData[CertificateErrorKey] = $"Medical certificate submitted, but we couldn't send notification email(s): {hrError}";
+                }
+            }
         }
         catch (DbUpdateException)
         {
@@ -500,4 +570,46 @@ public sealed class EmployeeDashboardController : Controller
 
         return name[^256..];
     }
+
+    private async Task<string?> NotifyHrsAsync(int organizationId, Func<AppUser, (string Subject, string Body)> messageFactory)
+    {
+        var hrUsers = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.OrganizationId == organizationId && u.Role == RoleType.HR && u.IsActive)
+            .ToListAsync();
+
+        if (hrUsers.Count == 0)
+        {
+            return null;
+        }
+
+        var failures = new List<string>();
+
+        foreach (var hr in hrUsers)
+        {
+            if (string.IsNullOrWhiteSpace(hr.Email))
+            {
+                continue;
+            }
+
+            var (subject, body) = messageFactory(hr);
+            var (ok, error) = await _email.SendAsync(hr.Email, subject, body);
+            if (!ok)
+            {
+                var detail = string.IsNullOrWhiteSpace(error) ? hr.Email : $"{hr.Email}: {error}";
+                failures.Add(detail);
+            }
+        }
+
+        return failures.Count == 0 ? null : string.Join("; ", failures);
+    }
+
+    private static string FormatLeaveType(LeaveType type) => type switch
+    {
+        LeaveType.Annual    => "Annual leave",
+        LeaveType.Sick      => "Sick leave",
+        LeaveType.Emergency => "Emergency leave",
+        LeaveType.Unpaid    => "Unpaid leave",
+        _                   => "Other leave"
+    };
 }
