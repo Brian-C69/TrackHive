@@ -9,7 +9,7 @@ using TrackHive.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
+QuestPDF.Settings.License = LicenseType.Community;
 
 // MVC + global MustChangePassword filter
 builder.Services.AddControllersWithViews(options =>
