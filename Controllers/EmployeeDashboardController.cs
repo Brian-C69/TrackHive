@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +11,8 @@ public sealed class EmployeeDashboardController : Controller
 {
     private readonly AppDbContext _db;
     private const string LeaveMessageKey = "LeaveMessage";
-    private const string LeaveErrorKey = "LeaveError";
+    private const string LeaveErrorKey   = "LeaveError";
+
     public EmployeeDashboardController(AppDbContext db) => _db = db;
 
     [HttpGet]
@@ -38,6 +39,7 @@ public sealed class EmployeeDashboardController : Controller
             .Take(14)
             .ToListAsync();
 
+        // --- Leave: balance + requests
         var leaveBalance = await _db.LeaveBalances
             .AsNoTracking()
             .FirstOrDefaultAsync(l => l.UserId == id);
@@ -74,32 +76,34 @@ public sealed class EmployeeDashboardController : Controller
                     CheckOutTime = r.CheckOutTime
                 })
                 .ToList(),
-            CanCheckIn = todayRecord is null || !todayRecord.CheckInTime.HasValue,
+            CanCheckIn  = todayRecord is null || !todayRecord.CheckInTime.HasValue,
             CanCheckOut = todayRecord is not null && todayRecord.CheckInTime.HasValue && !todayRecord.CheckOutTime.HasValue,
+
+            // --- Leave section for the dashboard
             LeaveBalance = new LeaveBalanceViewModel
             {
                 AnnualEntitlement = leaveBalance?.AnnualEntitlement ?? LeaveBalance.DefaultAnnualEntitlement,
-                UsedDays = leaveBalance?.UsedDays ?? 0,
-                PendingDays = pendingLeaveDays
+                UsedDays          = leaveBalance?.UsedDays ?? 0,
+                PendingDays       = pendingLeaveDays
             },
             LeaveRequests = leaveRequests
                 .Select(r => new LeaveRequestListItemViewModel
                 {
-                    Id = r.Id,
-                    StartDate = r.StartDate,
-                    EndDate = r.EndDate,
-                    TotalDays = r.TotalDays,
-                    Status = r.Status,
-                    Reason = r.Reason,
-                    CreatedAt = r.CreatedAt,
-                    ReviewedAt = r.ReviewedAt,
-                    ReviewedByName = r.ReviewedBy?.Name
+                    Id            = r.Id,
+                    StartDate     = r.StartDate,
+                    EndDate       = r.EndDate,
+                    TotalDays     = r.TotalDays,
+                    Status        = r.Status,
+                    Reason        = r.Reason,
+                    CreatedAt     = r.CreatedAt,
+                    ReviewedAt    = r.ReviewedAt,
+                    ReviewedByName= r.ReviewedBy?.Name
                 })
                 .ToList(),
             LeaveApplication = new ApplyLeaveViewModel
             {
                 StartDate = today,
-                EndDate = today
+                EndDate   = today
             }
         };
 
@@ -114,7 +118,7 @@ public sealed class EmployeeDashboardController : Controller
         if (!int.TryParse(idStr, out var id)) return RedirectToAction("Login", "Auth");
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var now = DateTimeOffset.UtcNow;
+        var now   = DateTimeOffset.UtcNow;
 
         var record = await _db.AttendanceRecords.FirstOrDefaultAsync(a => a.UserId == id && a.Date == today);
 
@@ -152,6 +156,7 @@ public sealed class EmployeeDashboardController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    // --- Leave application
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ApplyLeave(ApplyLeaveViewModel model)
@@ -166,7 +171,7 @@ public sealed class EmployeeDashboardController : Controller
         }
 
         var start = model.StartDate.Value;
-        var end = model.EndDate.Value;
+        var end   = model.EndDate.Value;
 
         if (end < start)
         {
@@ -209,12 +214,12 @@ public sealed class EmployeeDashboardController : Controller
 
         var request = new LeaveRequest
         {
-            UserId = id,
+            UserId    = id,
             StartDate = start,
-            EndDate = end,
+            EndDate   = end,
             TotalDays = totalDays,
-            Reason = string.IsNullOrWhiteSpace(model.Reason) ? null : model.Reason.Trim(),
-            Status = LeaveRequestStatus.Pending,
+            Reason    = string.IsNullOrWhiteSpace(model.Reason) ? null : model.Reason.Trim(),
+            Status    = LeaveRequestStatus.Pending,
             CreatedAt = DateTimeOffset.UtcNow
         };
 
@@ -241,7 +246,7 @@ public sealed class EmployeeDashboardController : Controller
         if (!int.TryParse(idStr, out var id)) return RedirectToAction("Login", "Auth");
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var now = DateTimeOffset.UtcNow;
+        var now   = DateTimeOffset.UtcNow;
 
         var record = await _db.AttendanceRecords.FirstOrDefaultAsync(a => a.UserId == id && a.Date == today);
 
@@ -272,4 +277,3 @@ public sealed class EmployeeDashboardController : Controller
         return RedirectToAction(nameof(Index));
     }
 }
-

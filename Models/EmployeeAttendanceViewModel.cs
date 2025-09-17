@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
+
 namespace TrackHive.Models;
 
 public sealed class EmployeeAttendanceViewModel

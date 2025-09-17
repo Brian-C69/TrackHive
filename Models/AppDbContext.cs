@@ -13,6 +13,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<LeaveRequest> LeaveRequests => Set<LeaveRequest>();
     public DbSet<LeaveBalance> LeaveBalances => Set<LeaveBalance>();
 
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
 
