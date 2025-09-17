@@ -1,9 +1,12 @@
 using System.Globalization;
+using System.IO;
+using System.Linq;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TrackHive.Models;
+using TrackHive.Services;
 
 namespace TrackHive.Controllers;
 
@@ -11,10 +14,15 @@ namespace TrackHive.Controllers;
 public sealed class PayrollController : Controller
 {
     private readonly AppDbContext _db;
+    private readonly PayrollPdfGenerator _pdfGenerator;
     private const decimal StandardDailyHours = 8m;
     private const decimal DefaultOvertimeMultiplier = 1.5m;
 
-    public PayrollController(AppDbContext db) => _db = db;
+    public PayrollController(AppDbContext db, PayrollPdfGenerator pdfGenerator)
+    {
+        _db = db;
+        _pdfGenerator = pdfGenerator;
+    }
 
     [HttpGet]
     public async Task<IActionResult> Index(int? employeeId = null, int? year = null, int? month = null)
@@ -49,6 +57,8 @@ public sealed class PayrollController : Controller
                 alertType = "warning";
             }
         }
+
+        ApplyTempAlert(ref alertMessage, ref alertType);
 
         var viewModel = new PayrollIndexViewModel
         {
@@ -138,6 +148,8 @@ public sealed class PayrollController : Controller
             history = await LoadHistoryAsync(form.SelectedEmployeeId.Value);
         }
 
+        ApplyTempAlert(ref alertMessage, ref alertType);
+
         var viewModel = new PayrollIndexViewModel
         {
             Employees = employees,
@@ -150,6 +162,267 @@ public sealed class PayrollController : Controller
 
         return View("Index", viewModel);
     }
+
+    [HttpGet]
+    public async Task<IActionResult> DownloadPayslip(int employeeId, int year, int month)
+    {
+        var hr = await GetCurrentUserAsync();
+        if (hr is null) return RedirectToAction("Login", "Auth");
+        if (hr.MustChangePassword) return RedirectToAction("ChangePassword", "Auth");
+
+        var form = new PayrollCalculationForm
+        {
+            SelectedEmployeeId = employeeId,
+            Year = year,
+            Month = month,
+            ManualDeductions = 0m,
+            AdditionalOvertimeHours = 0m
+        };
+
+        var routeValues = new { employeeId, year, month };
+
+        var result = await TryCreatePayslipAsync(hr, form, allowRecalculation: false);
+        if (result.Document is null)
+        {
+            if (!string.IsNullOrEmpty(result.ErrorMessage))
+            {
+                SetTempAlert(result.ErrorMessage, result.AlertType);
+            }
+
+            return RedirectToAction("Index", routeValues);
+        }
+
+        return CreatePayslipFile(result.Document, year, month);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DownloadPayslip(PayrollCalculationForm form)
+    {
+        var hr = await GetCurrentUserAsync();
+        if (hr is null) return RedirectToAction("Login", "Auth");
+        if (hr.MustChangePassword) return RedirectToAction("ChangePassword", "Auth");
+
+        var routeValues = new { employeeId = form.SelectedEmployeeId, year = form.Year, month = form.Month };
+
+        var result = await TryCreatePayslipAsync(hr, form, allowRecalculation: true);
+        if (result.Document is null)
+        {
+            if (!string.IsNullOrEmpty(result.ErrorMessage))
+            {
+                SetTempAlert(result.ErrorMessage, result.AlertType);
+            }
+
+            return RedirectToAction("Index", routeValues);
+        }
+
+        return CreatePayslipFile(result.Document, form.Year, form.Month);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> DownloadReport(int year, int month)
+    {
+        var hr = await GetCurrentUserAsync();
+        if (hr is null) return RedirectToAction("Login", "Auth");
+        if (hr.MustChangePassword) return RedirectToAction("ChangePassword", "Auth");
+
+        if (year < 2000 || year > 2100 || month < 1 || month > 12)
+        {
+            SetTempAlert("Choose a valid month and year to export the payroll report.", "warning");
+            return RedirectToAction("Index", new { year, month });
+        }
+
+        var records = await _db.PayrollRecords
+            .AsNoTracking()
+            .Include(r => r.User)
+            .Where(r => r.Year == year && r.Month == month && r.User != null && r.User.OrganizationId == hr.OrganizationId)
+            .OrderBy(r => r.User!.Name)
+            .ToListAsync();
+
+        if (records.Count == 0)
+        {
+            var label = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+            SetTempAlert($"No payroll records found for {label}.", "warning");
+            return RedirectToAction("Index", new { year, month });
+        }
+
+        var organization = await _db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == hr.OrganizationId);
+        if (organization is null)
+        {
+            return NotFound();
+        }
+
+        var entries = records
+            .Select(r => new PayrollReportEntry(
+                r.User!.Name,
+                r.User.Email,
+                r.GrossPay,
+                r.NetPay,
+                r.Deductions,
+                r.OvertimePay,
+                r.TotalOvertimeHours,
+                r.WorkingDays,
+                r.PresentDays,
+                r.CalculatedAt))
+            .ToList();
+
+        var model = new PayrollReportDocumentModel(organization.Name, year, month, DateTimeOffset.UtcNow, entries);
+
+        var pdf = _pdfGenerator.GenerateMonthlyReport(model);
+        var safeOrg = SanitizeFileName(model.OrganizationName);
+        var fileName = $"{safeOrg}_{year}-{month:00}_PayrollReport.pdf";
+
+        return File(pdf, "application/pdf", fileName);
+    }
+
+    private void SetTempAlert(string message, string type)
+    {
+        TempData["PayrollAlert.Message"] = message;
+        TempData["PayrollAlert.Type"] = type;
+    }
+
+    private void ApplyTempAlert(ref string? message, ref string alertType)
+    {
+        if (TempData.TryGetValue("PayrollAlert.Message", out var storedMessageObj) && storedMessageObj is string storedMessage && !string.IsNullOrWhiteSpace(storedMessage))
+        {
+            message ??= storedMessage;
+            if (TempData.TryGetValue("PayrollAlert.Type", out var storedTypeObj) && storedTypeObj is string storedType && !string.IsNullOrWhiteSpace(storedType))
+            {
+                alertType = storedType;
+            }
+        }
+    }
+
+    private FileContentResult CreatePayslipFile(PayslipDocumentModel document, int year, int month)
+    {
+        var pdf = _pdfGenerator.GeneratePayslip(document);
+        var safeOrg = SanitizeFileName(document.OrganizationName);
+        var safeEmployee = SanitizeFileName(document.EmployeeName);
+        var fileName = $"{safeOrg}_{safeEmployee}_{year}-{month:00}_Payslip.pdf";
+        return File(pdf, "application/pdf", fileName);
+    }
+
+    private async Task<PayslipGenerationResult> TryCreatePayslipAsync(AppUser hr, PayrollCalculationForm form, bool allowRecalculation)
+    {
+        if (form.SelectedEmployeeId is null)
+        {
+            return new PayslipGenerationResult(null, "Select an employee to generate a payslip.", "warning");
+        }
+
+        if (form.Year < 2000 || form.Year > 2100 || form.Month < 1 || form.Month > 12)
+        {
+            return new PayslipGenerationResult(null, "Choose a valid month and year for the payslip.", "warning");
+        }
+
+        if (form.ManualDeductions < 0 || form.AdditionalOvertimeHours < 0)
+        {
+            return new PayslipGenerationResult(null, "Deductions and overtime hours cannot be negative.", "warning");
+        }
+
+        var employee = await _db.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == form.SelectedEmployeeId.Value && u.OrganizationId == hr.OrganizationId && u.Role == RoleType.Employee);
+
+        if (employee is null)
+        {
+            return new PayslipGenerationResult(null, "Employee not found.", "danger");
+        }
+
+        var organization = await _db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == hr.OrganizationId);
+        if (organization is null)
+        {
+            return new PayslipGenerationResult(null, "Organization not found.", "danger");
+        }
+
+        var periodLabel = new DateTime(form.Year, form.Month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+
+        var record = await _db.PayrollRecords
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.UserId == employee.Id && r.Year == form.Year && r.Month == form.Month);
+
+        if (record is not null)
+        {
+            var absentDays = Math.Max(record.WorkingDays - record.PresentDays, 0);
+            var document = new PayslipDocumentModel(
+                organization.Name,
+                employee.Name,
+                employee.Email,
+                periodLabel,
+                record.CalculatedAt,
+                record.MonthlySalary,
+                record.WorkingDays,
+                record.PresentDays,
+                absentDays,
+                record.StandardHours,
+                record.WorkedHours,
+                record.HourlyRate,
+                record.AutoOvertimeHours,
+                record.AdditionalOvertimeHours,
+                record.TotalOvertimeHours,
+                record.OvertimeMultiplier,
+                record.AttendancePay,
+                record.OvertimePay,
+                record.Deductions,
+                record.GrossPay,
+                record.NetPay);
+
+            return new PayslipGenerationResult(document, null, "success");
+        }
+
+        if (!allowRecalculation)
+        {
+            return new PayslipGenerationResult(null, $"No saved payroll record found for {periodLabel}.", "warning");
+        }
+
+        var calculation = await BuildCalculationAsync(hr.OrganizationId, employee.Id, form.Year, form.Month, form.ManualDeductions, form.AdditionalOvertimeHours);
+        if (calculation is null)
+        {
+            return new PayslipGenerationResult(null, "Unable to calculate the payslip for the selected period.", "danger");
+        }
+
+        var calculatedDocument = new PayslipDocumentModel(
+            organization.Name,
+            calculation.EmployeeName,
+            employee.Email,
+            calculation.PeriodLabel,
+            DateTimeOffset.UtcNow,
+            calculation.MonthlySalary,
+            calculation.WorkingDays,
+            calculation.PresentDays,
+            calculation.AbsentDays,
+            calculation.StandardHours,
+            calculation.WorkedHours,
+            calculation.HourlyRate,
+            calculation.AutoOvertimeHours,
+            calculation.ManualOvertimeHours,
+            calculation.TotalOvertimeHours,
+            calculation.OvertimeMultiplier,
+            calculation.AttendancePay,
+            calculation.OvertimePay,
+            calculation.Deductions,
+            calculation.GrossPay,
+            calculation.NetPay);
+
+        return new PayslipGenerationResult(calculatedDocument, null, "success");
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "document";
+        }
+
+        var sanitized = value.Replace(' ', '_');
+        foreach (var invalid in Path.GetInvalidFileNameChars())
+        {
+            sanitized = sanitized.Replace(invalid, '_');
+        }
+
+        return sanitized;
+    }
+
+    private sealed record PayslipGenerationResult(PayslipDocumentModel? Document, string? ErrorMessage, string AlertType);
 
     private async Task<AppUser?> GetCurrentUserAsync()
     {
