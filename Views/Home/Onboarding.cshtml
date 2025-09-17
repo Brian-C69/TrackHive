@@ -1,0 +1,115 @@
+@{
+    Layout = "~/Views/Shared/_Layout.App.cshtml";
+    ViewData["Title"] = "Employee onboarding";
+    var languageClaim = User?.FindFirstValue(UserClaimTypes.LanguagePreference);
+    var currentLanguage = LanguagePreferences.Normalize(languageClaim);
+}
+
+<div class="row justify-content-center">
+    <div class="col-xl-9 col-xxl-8">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <div class="d-flex flex-column flex-md-row align-items-md-center gap-4">
+                    <div class="flex-grow-1">
+                        <h1 class="h3 mb-2 fw-semibold text-primary" id="heroTitle">Welcome to TrackHive</h1>
+                        <p class="mb-0 text-secondary" id="heroSubtitle">This onboarding guide introduces our culture, expectations, and the resources that help you thrive.</p>
+                    </div>
+                    <div class="ms-md-auto w-100" style="max-width: 260px;">
+                        <label class="form-label fw-semibold mb-1" for="onboardingLanguage">
+                            <span id="languageLabelText">Display language</span>
+                        </label>
+                        <select class="form-select" id="onboardingLanguage">
+                            @foreach (var option in LanguagePreferences.SupportedLanguages)
+                            {
+                                <option value="@option.Value" @(option.Value == currentLanguage ? "selected" : null)>@option.Label</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="onboardingError" class="alert alert-danger d-none mb-4" role="alert">
+            Unable to load translations. Please try again.
+        </div>
+
+        <section class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <h2 class="h5 mb-3" id="valuesTitle">Our company values</h2>
+                <p class="text-secondary mb-4" id="valuesDescription">These principles guide how we collaborate and serve our customers.</p>
+                <div class="vstack gap-3" id="valuesList">
+                    <div class="p-3 border rounded">
+                        <h3 class="h6 mb-1">Integrity first</h3>
+                        <p class="mb-0 text-secondary small">We act with honesty, keep our commitments, and own our decisions.</p>
+                    </div>
+                    <div class="p-3 border rounded">
+                        <h3 class="h6 mb-1">Empathy for people</h3>
+                        <p class="mb-0 text-secondary small">We listen carefully to colleagues and customers to understand their needs.</p>
+                    </div>
+                    <div class="p-3 border rounded">
+                        <h3 class="h6 mb-1">Continuous improvement</h3>
+                        <p class="mb-0 text-secondary small">We experiment, learn, and refine the way we work every day.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <h2 class="h5 mb-3" id="conductTitle">Code of conduct</h2>
+                <p class="text-secondary mb-4" id="conductDescription">Keep these rules in mind as you work with your team.</p>
+                <div class="vstack gap-3" id="conductList">
+                    <div class="p-3 border rounded">
+                        <h3 class="h6 mb-1">Respectful communication</h3>
+                        <p class="mb-0 text-secondary small">Use inclusive language, be punctual, and keep discussions professional.</p>
+                    </div>
+                    <div class="p-3 border rounded">
+                        <h3 class="h6 mb-1">Protect confidential data</h3>
+                        <p class="mb-0 text-secondary small">Never share customer or employee information outside authorized channels.</p>
+                    </div>
+                    <div class="p-3 border rounded">
+                        <h3 class="h6 mb-1">Ask for help early</h3>
+                        <p class="mb-0 text-secondary small">Raise blockers quickly so we can solve them together.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <h2 class="h5 mb-3" id="safetyTitle">Safety and wellbeing</h2>
+                <p class="text-secondary mb-4" id="safetyDescription">Your wellbeing matters—let us know if something feels unsafe.</p>
+                <div class="vstack gap-3" id="safetyList">
+                    <div class="p-3 border rounded">
+                        <h3 class="h6 mb-1">Workspace ergonomics</h3>
+                        <p class="mb-0 text-secondary small">Adjust your workstation and take short breaks every hour.</p>
+                    </div>
+                    <div class="p-3 border rounded">
+                        <h3 class="h6 mb-1">Security practices</h3>
+                        <p class="mb-0 text-secondary small">Lock your device when away and report suspicious activity immediately.</p>
+                    </div>
+                    <div class="p-3 border rounded">
+                        <h3 class="h6 mb-1">Emergency procedures</h3>
+                        <p class="mb-0 text-secondary small">Follow the building evacuation plan and check in with your lead during drills.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <h2 class="h5 mb-3" id="nextStepsTitle">Your next steps</h2>
+                <ol class="ps-3 mb-0" id="nextStepsList">
+                    <li class="mb-2">Meet your mentor during the first week to review role expectations.</li>
+                    <li class="mb-2">Complete required training courses listed in the Learning Portal.</li>
+                    <li class="mb-2">Review project documentation in the shared drive.</li>
+                    <li class="mb-0">Join the #welcome channel to introduce yourself to the team.</li>
+                </ol>
+            </div>
+        </section>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/onboarding.js"></script>
+}

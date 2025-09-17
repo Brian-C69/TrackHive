@@ -29,6 +29,7 @@ public static class NavigationMenu
             RoleType.Employee => new List<NavigationLink>
             {
                 new("employee-dashboard", "Employee Dashboard", "bi-speedometer2", "EmployeeDashboard", "Index", "Main"),
+                new("onboarding", "Onboarding", "bi-journal-check", "Home", "Onboarding", "Main"),
                 new("preferences", "Preferences", "bi-sliders2", "Profile", "Preferences", "Account"),
                 new("profile", "My profile", "bi-person-circle", "Profile", "Index", "Account"),
             },

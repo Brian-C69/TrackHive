@@ -1,5 +1,66 @@
 {
   "code": "en",
   "name": "English",
-  "translations": {}
+  "translations": {
+    "onboarding": {
+      "heroTitle": "Welcome to TrackHive",
+      "heroSubtitle": "This onboarding guide introduces our culture, expectations, and the resources that help you thrive.",
+      "languageLabel": "Display language",
+      "valuesTitle": "Our company values",
+      "valuesDescription": "These principles guide how we collaborate and serve our customers.",
+      "values": [
+        {
+          "title": "Integrity first",
+          "description": "We act with honesty, keep our commitments, and own our decisions."
+        },
+        {
+          "title": "Empathy for people",
+          "description": "We listen carefully to colleagues and customers to understand their needs."
+        },
+        {
+          "title": "Continuous improvement",
+          "description": "We experiment, learn, and refine the way we work every day."
+        }
+      ],
+      "conductTitle": "Code of conduct",
+      "conductDescription": "Keep these rules in mind as you work with your team.",
+      "conduct": [
+        {
+          "title": "Respectful communication",
+          "description": "Use inclusive language, be punctual, and keep discussions professional."
+        },
+        {
+          "title": "Protect confidential data",
+          "description": "Never share customer or employee information outside authorized channels."
+        },
+        {
+          "title": "Ask for help early",
+          "description": "Raise blockers quickly so we can solve them together."
+        }
+      ],
+      "safetyTitle": "Safety and wellbeing",
+      "safetyDescription": "Your wellbeing matters—let us know if something feels unsafe.",
+      "safety": [
+        {
+          "title": "Workspace ergonomics",
+          "description": "Adjust your workstation and take short breaks every hour."
+        },
+        {
+          "title": "Security practices",
+          "description": "Lock your device when away and report suspicious activity immediately."
+        },
+        {
+          "title": "Emergency procedures",
+          "description": "Follow the building evacuation plan and check in with your lead during drills."
+        }
+      ],
+      "nextStepsTitle": "Your next steps",
+      "nextSteps": [
+        "Meet your mentor during the first week to review role expectations.",
+        "Complete required training courses listed in the Learning Portal.",
+        "Review project documentation in the shared drive.",
+        "Join the #welcome channel to introduce yourself to the team."
+      ]
+    }
+  }
 }

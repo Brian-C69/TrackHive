@@ -1,5 +1,66 @@
 {
   "code": "ms",
   "name": "Malay",
-  "translations": {}
+  "translations": {
+    "onboarding": {
+      "heroTitle": "Selamat datang ke TrackHive",
+      "heroSubtitle": "Panduan orientasi ini memperkenalkan budaya kami, jangkaan kerja, dan sumber yang membantu anda cemerlang.",
+      "languageLabel": "Bahasa paparan",
+      "valuesTitle": "Nilai syarikat kami",
+      "valuesDescription": "Prinsip-prinsip ini memandu cara kami bekerjasama dan melayani pelanggan.",
+      "values": [
+        {
+          "title": "Integriti diutamakan",
+          "description": "Kami bertindak dengan jujur, menunaikan komitmen, dan bertanggungjawab atas keputusan."
+        },
+        {
+          "title": "Empati terhadap orang",
+          "description": "Kami mendengar rakan sekerja dan pelanggan untuk memahami keperluan mereka."
+        },
+        {
+          "title": "Penambahbaikan berterusan",
+          "description": "Kami bereksperimen, belajar, dan menambah baik cara bekerja setiap hari."
+        }
+      ],
+      "conductTitle": "Tatakelakuan",
+      "conductDescription": "Ingat peraturan ini semasa bekerjasama dengan pasukan anda.",
+      "conduct": [
+        {
+          "title": "Komunikasi penuh hormat",
+          "description": "Gunakan bahasa inklusif, tepat masa, dan kekalkan perbincangan profesional."
+        },
+        {
+          "title": "Lindungi data sulit",
+          "description": "Jangan kongsi maklumat pelanggan atau pekerja di luar saluran yang dibenarkan."
+        },
+        {
+          "title": "Minta bantuan awal",
+          "description": "Maklumkan halangan dengan segera supaya kita boleh menyelesaikannya bersama."
+        }
+      ],
+      "safetyTitle": "Keselamatan dan kesejahteraan",
+      "safetyDescription": "Kesejahteraan anda penting—beritahu kami jika sesuatu berasa tidak selamat.",
+      "safety": [
+        {
+          "title": "Ergonomik tempat kerja",
+          "description": "Laraskan stesen kerja dan ambil rehat pendek setiap jam."
+        },
+        {
+          "title": "Amalan keselamatan",
+          "description": "Kunci peranti apabila meninggalkannya dan laporkan aktiviti mencurigakan segera."
+        },
+        {
+          "title": "Prosedur kecemasan",
+          "description": "Ikuti pelan pemindahan bangunan dan lapor kepada penyelia semasa latihan kecemasan."
+        }
+      ],
+      "nextStepsTitle": "Langkah seterusnya anda",
+      "nextSteps": [
+        "Berjumpa mentor anda pada minggu pertama untuk menyemak jangkaan peranan.",
+        "Selesaikan kursus latihan wajib dalam Portal Pembelajaran.",
+        "Semak dokumentasi projek dalam pemacu bersama.",
+        "Sertai saluran #welcome untuk memperkenalkan diri kepada pasukan."
+      ]
+    }
+  }
 }
