@@ -1,9 +1,15 @@
-﻿:root {
+:root {
     --brand: #0d6efd;
+    --sidebar-hover: var(--bs-tertiary-bg);
+}
+
+[data-bs-theme="dark"] {
+    --brand: #66b2ff;
+    --sidebar-hover: rgba(255, 255, 255, 0.08);
 }
 
 body {
-    background: #f8fafc;
+    background: var(--bs-body-bg);
 }
 
 .navbar-brand {
@@ -14,20 +20,25 @@ body {
 .app-shell .sidebar {
     width: 260px;
     min-height: 100vh;
-    background: #ffffff;
+    background: var(--bs-body-bg);
+}
+
+.app-shell .sidebar .sidebar-brand a {
+    color: inherit;
 }
 
 .app-shell .nav-link {
-    color: #333;
+    color: var(--bs-body-color);
     padding: 0.6rem 1rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .app-shell .nav-link:hover {
-    background: #f1f5f9;
+    background: var(--sidebar-hover);
+    color: var(--bs-body-color);
 }
 
 .app-shell .nav-link-icon {
@@ -77,13 +88,9 @@ body {
 }
 
 /* Make container full-width in app layout */
-.app-shell .container, .app-shell .container-fluid {
+.app-shell .container,
+.app-shell .container-fluid {
     max-width: 100%;
-}
-
-/* Utility */
-.text-secondary {
-    color: #6c757d !important;
 }
 
 /* Keep footer stuck to bottom in app layout */

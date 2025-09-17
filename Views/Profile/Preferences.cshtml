@@ -1,0 +1,123 @@
+@model TrackHive.Models.UserPreferencesViewModel
+@{
+    Layout = "~/Views/Shared/_Layout.App.cshtml";
+    ViewData["Title"] = "Preferences";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-xl-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h1 class="h5 mb-3">User preferences</h1>
+
+                @if (TempData["Toast"] is string toast)
+                {
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        @toast
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                }
+
+                <form asp-action="Preferences" method="post" class="needs-validation" novalidate>
+                    @Html.AntiForgeryToken()
+
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Theme</label>
+                        <p class="text-secondary small mb-2">Choose how TrackHive looks on this device.</p>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" asp-for="Theme" value="light" id="themeLight" />
+                            <label class="form-check-label" for="themeLight">Light</label>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="radio" asp-for="Theme" value="dark" id="themeDark" />
+                            <label class="form-check-label" for="themeDark">Dark</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Navigation menu order</label>
+                        <p class="text-secondary small mb-3">Use the arrows to arrange items in the sidebar menu.</p>
+
+                        @if (Model.NavigationLinks?.Count > 0)
+                        {
+                            <ul class="list-group" id="navOrderList">
+                                @foreach (var item in Model.NavigationLinks)
+                                {
+                                    <li class="list-group-item d-flex align-items-center gap-2" data-id="@item.Id">
+                                        <i class="bi @item.Icon text-secondary" aria-hidden="true"></i>
+                                        <div class="flex-grow-1">
+                                            <div class="fw-semibold">@item.Label</div>
+                                            <div class="text-secondary small">@item.Section</div>
+                                        </div>
+                                        <div class="btn-group btn-group-sm" role="group" aria-label="Reorder @item.Label">
+                                            <button type="button" class="btn btn-outline-secondary" data-move="up" title="Move up" aria-label="Move @item.Label up">
+                                                <i class="bi bi-arrow-up" aria-hidden="true"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary" data-move="down" title="Move down" aria-label="Move @item.Label down">
+                                                <i class="bi bi-arrow-down" aria-hidden="true"></i>
+                                            </button>
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <p class="text-secondary small">There are no navigation items available for your role.</p>
+                        }
+
+                        <input asp-for="NavigationOrder" type="hidden" />
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary">Save preferences</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (() => {
+            const list = document.getElementById('navOrderList');
+            const orderInput = document.getElementById('NavigationOrder');
+            if (!list || !orderInput) {
+                return;
+            }
+
+            const updateOrder = () => {
+                const ids = Array.from(list.querySelectorAll('li[data-id]'))
+                    .map(item => item.getAttribute('data-id'))
+                    .filter(Boolean);
+                orderInput.value = ids.join(',');
+            };
+
+            list.addEventListener('click', (event) => {
+                const button = event.target.closest('button[data-move]');
+                if (!button) {
+                    return;
+                }
+
+                event.preventDefault();
+                const item = button.closest('li[data-id]');
+                if (!item) {
+                    return;
+                }
+
+                if (button.dataset.move === 'up' && item.previousElementSibling) {
+                    item.parentElement.insertBefore(item, item.previousElementSibling);
+                } else if (button.dataset.move === 'down' && item.nextElementSibling) {
+                    item.parentElement.insertBefore(item.nextElementSibling, item);
+                }
+
+                updateOrder();
+            });
+
+            updateOrder();
+        })();
+    </script>
+}
