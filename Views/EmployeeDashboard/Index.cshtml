@@ -301,10 +301,9 @@
                                                     }
                                                     else if (request.AwaitingHrReview)
                                                     {
-                                                        @{ 
-                                                            var latest = request.Documents.OrderByDescending(d => d.UploadedAt).FirstOrDefault();
-                                                            var submittedOn = latest?.UploadedAt.ToLocalTime() ?? request.CreatedAt.ToLocalTime();
-                                                        }
+                                                        @* Removed unnecessary @{ block *@
+                                                        var latest = request.Documents.OrderByDescending(d => d.UploadedAt).FirstOrDefault();
+                                                        var submittedOn = latest?.UploadedAt.ToLocalTime() ?? request.CreatedAt.ToLocalTime();
                                                         <div class="alert alert-info py-2 px-3 small mb-0">
                                                             Submitted to HR on @submittedOn:MMM d, yyyy h:mm tt.
                                                         </div>
