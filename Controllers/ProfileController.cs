@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using SixLabors.ImageSharp;
@@ -59,11 +60,14 @@ public sealed class ProfileController : Controller
         if (user is null) return RedirectToAction("Login", "Auth");
 
         var theme = NormalizeTheme(user.ThemePreference);
+        var language = LanguagePreferences.Normalize(user.LanguagePreference);
         var orderedLinks = NavigationMenu.ApplyOrder(NavigationMenu.GetLinksForRole(user.Role), user.NavigationOrder);
 
         var model = new UserPreferencesViewModel
         {
             Theme = theme,
+            Language = language,
+            Languages = CreateLanguageSelectList(language),
             NavigationLinks = orderedLinks.ToList(),
             NavigationOrder = string.Join(',', orderedLinks.Select(link => link.Id))
         };
@@ -79,12 +83,15 @@ public sealed class ProfileController : Controller
         if (user is null) return RedirectToAction("Login", "Auth");
 
         var theme = NormalizeTheme(model.Theme);
+        var language = LanguagePreferences.Normalize(model.Language);
         var baseLinks = NavigationMenu.GetLinksForRole(user.Role);
         var orderedLinks = NavigationMenu.ApplyOrder(baseLinks, model.NavigationOrder);
         var normalizedOrder = string.Join(',', orderedLinks.Select(link => link.Id));
         var defaultOrder = string.Join(',', baseLinks.Select(link => link.Id));
 
         model.Theme = theme;
+        model.Language = language;
+        model.Languages = CreateLanguageSelectList(language);
         model.NavigationLinks = orderedLinks.ToList();
         model.NavigationOrder = normalizedOrder;
 
@@ -94,6 +101,7 @@ public sealed class ProfileController : Controller
         }
 
         user.ThemePreference = theme;
+        user.LanguagePreference = language;
         user.NavigationOrder = string.IsNullOrEmpty(normalizedOrder) || normalizedOrder == defaultOrder
             ? null
             : normalizedOrder;
@@ -176,6 +184,7 @@ public sealed class ProfileController : Controller
     private async Task RefreshSignInAsync(AppUser user)
     {
         var theme = NormalizeTheme(user.ThemePreference);
+        var language = LanguagePreferences.Normalize(user.LanguagePreference);
         var navOrder = user.NavigationOrder ?? string.Empty;
 
         var claims = new List<Claim>
@@ -185,7 +194,8 @@ public sealed class ProfileController : Controller
             new(ClaimTypes.Email, user.Email),
             new(ClaimTypes.Role, user.Role.ToString()),
             new(UserClaimTypes.OrganizationId, user.OrganizationId.ToString()),
-            new(UserClaimTypes.ThemePreference, theme)
+            new(UserClaimTypes.ThemePreference, theme),
+            new(UserClaimTypes.LanguagePreference, language)
         };
 
         if (!string.IsNullOrWhiteSpace(navOrder))
@@ -204,6 +214,18 @@ public sealed class ProfileController : Controller
 
     private static string NormalizeTheme(string? value) =>
         string.Equals(value, "dark", StringComparison.OrdinalIgnoreCase) ? "dark" : "light";
+
+    private static List<SelectListItem> CreateLanguageSelectList(string selected)
+    {
+        return LanguagePreferences.SupportedLanguages
+            .Select(option => new SelectListItem
+            {
+                Value = option.Value,
+                Text = option.Label,
+                Selected = string.Equals(option.Value, selected, StringComparison.Ordinal)
+            })
+            .ToList();
+    }
 
     private async Task<string?> SaveProfileImageAsync(AppUser user, ProfileViewModel model)
     {
