@@ -159,7 +159,7 @@ public sealed class EmployeeDashboardController : Controller
     // --- Leave application
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ApplyLeave(ApplyLeaveViewModel model)
+    public async Task<IActionResult> ApplyLeave([Bind(Prefix = nameof(EmployeeAttendanceViewModel.LeaveApplication))] ApplyLeaveViewModel model)
     {
         var idStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!int.TryParse(idStr, out var id)) return RedirectToAction("Login", "Auth");
