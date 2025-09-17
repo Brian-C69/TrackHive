@@ -1,5 +1,9 @@
+using System.IO;
+using System.Linq;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TrackHive.Models;
@@ -12,8 +16,17 @@ public sealed class EmployeeDashboardController : Controller
     private readonly AppDbContext _db;
     private const string LeaveMessageKey = "LeaveMessage";
     private const string LeaveErrorKey   = "LeaveError";
+    private const string CertificateMessageKey = "CertificateMessage";
+    private const string CertificateErrorKey   = "CertificateError";
+    private const long MaxCertificateFileBytes = 5 * 1024 * 1024; // 5 MB per file
+    private static readonly string[] AllowedCertificateExtensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".pdf", ".heic", ".heif"];
+    private readonly IWebHostEnvironment _environment;
 
-    public EmployeeDashboardController(AppDbContext db) => _db = db;
+    public EmployeeDashboardController(AppDbContext db, IWebHostEnvironment environment)
+    {
+        _db = db;
+        _environment = environment;
+    }
 
     [HttpGet]
     public async Task<IActionResult> Index()
@@ -48,6 +61,7 @@ public sealed class EmployeeDashboardController : Controller
             .AsNoTracking()
             .Where(r => r.UserId == id)
             .Include(r => r.ReviewedBy)
+            .Include(r => r.Documents)
             .OrderByDescending(r => r.CreatedAt)
             .Take(20)
             .ToListAsync();
@@ -94,16 +108,29 @@ public sealed class EmployeeDashboardController : Controller
                     EndDate       = r.EndDate,
                     TotalDays     = r.TotalDays,
                     Status        = r.Status,
+                    Type          = r.Type,
                     Reason        = r.Reason,
                     CreatedAt     = r.CreatedAt,
                     ReviewedAt    = r.ReviewedAt,
-                    ReviewedByName= r.ReviewedBy?.Name
+                    ReviewedByName= r.ReviewedBy?.Name,
+                    Documents     = r.Documents
+                        .OrderBy(d => d.UploadedAt)
+                        .Select(d => new LeaveDocumentViewModel
+                        {
+                            Id = d.Id,
+                            FileName = d.OriginalFileName,
+                            UploadedAt = d.UploadedAt,
+                            DownloadAction = Url.Action("Download", "LeaveDocuments", new { id = d.Id }) ?? string.Empty
+                        })
+                        .ToList(),
+                    RequiresMedicalCertificate = r.Type.RequiresMedicalCertificate()
                 })
                 .ToList(),
             LeaveApplication = new ApplyLeaveViewModel
             {
                 StartDate = today,
-                EndDate   = today
+                EndDate   = today,
+                LeaveType = LeaveType.Annual
             }
         };
 
@@ -186,6 +213,12 @@ public sealed class EmployeeDashboardController : Controller
             return RedirectToAction(nameof(Index));
         }
 
+        if (!Enum.IsDefined(typeof(LeaveType), model.LeaveType))
+        {
+            TempData[LeaveErrorKey] = "Please select a valid leave type.";
+            return RedirectToAction(nameof(Index));
+        }
+
         var balance = await _db.LeaveBalances.FirstOrDefaultAsync(l => l.UserId == id);
         if (balance is null)
         {
@@ -219,6 +252,7 @@ public sealed class EmployeeDashboardController : Controller
             EndDate   = end,
             TotalDays = totalDays,
             Reason    = string.IsNullOrWhiteSpace(model.Reason) ? null : model.Reason.Trim(),
+            Type      = model.LeaveType,
             Status    = LeaveRequestStatus.Pending,
             CreatedAt = DateTimeOffset.UtcNow
         };
@@ -233,6 +267,92 @@ public sealed class EmployeeDashboardController : Controller
         catch (DbUpdateException)
         {
             TempData[LeaveErrorKey] = "We couldn't submit your leave request. Please try again.";
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SubmitMedicalCertificate(int requestId, List<IFormFile>? files)
+    {
+        var idStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(idStr, out var userId)) return RedirectToAction("Login", "Auth");
+
+        var request = await _db.LeaveRequests
+            .Include(r => r.Documents)
+            .FirstOrDefaultAsync(r => r.Id == requestId && r.UserId == userId);
+
+        if (request is null)
+        {
+            TempData[CertificateErrorKey] = "Leave request not found.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (!request.Type.RequiresMedicalCertificate())
+        {
+            TempData[CertificateErrorKey] = "This leave does not require a medical certificate.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (request.Status is not LeaveRequestStatus.ApprovedAwaitingCertificate and not LeaveRequestStatus.CertificateRejected)
+        {
+            TempData[CertificateErrorKey] = "You cannot submit documents for this request right now.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var uploadFiles = files?
+            .Where(f => f is not null && f.Length > 0)
+            .ToList() ?? new List<IFormFile>();
+
+        if (uploadFiles.Count == 0)
+        {
+            TempData[CertificateErrorKey] = "Please choose at least one file.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        foreach (var file in uploadFiles)
+        {
+            if (file.Length > MaxCertificateFileBytes)
+            {
+                TempData[CertificateErrorKey] = "Each file must be 5 MB or smaller.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (!IsAllowedCertificateFile(file))
+            {
+                TempData[CertificateErrorKey] = "Only images or PDF files are allowed.";
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
+        RemoveExistingDocuments(request);
+
+        foreach (var file in uploadFiles)
+        {
+            var relativePath = await SaveCertificateFileAsync(request.Id, file);
+            var document = new LeaveDocument
+            {
+                LeaveRequestId = request.Id,
+                OriginalFileName = SanitizeOriginalFileName(file.FileName),
+                StoredFilePath = relativePath,
+                ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? null : file.ContentType,
+                UploadedAt = DateTimeOffset.UtcNow
+            };
+
+            _db.LeaveDocuments.Add(document);
+        }
+
+        request.Status = LeaveRequestStatus.AwaitingCertificateReview;
+
+        try
+        {
+            await _db.SaveChangesAsync();
+            TempData[CertificateMessageKey] = "Medical certificate submitted for HR review.";
+        }
+        catch (DbUpdateException)
+        {
+            TempData[CertificateErrorKey] = "We couldn't save your documents. Please try again.";
         }
 
         return RedirectToAction(nameof(Index));
@@ -275,5 +395,109 @@ public sealed class EmployeeDashboardController : Controller
         }
 
         return RedirectToAction(nameof(Index));
+    }
+
+    private static bool IsAllowedCertificateFile(IFormFile file)
+    {
+        if (file.ContentType is string contentType)
+        {
+            if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (string.Equals(contentType, "application/pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        var extension = Path.GetExtension(file.FileName);
+        if (string.IsNullOrWhiteSpace(extension)) return false;
+
+        return AllowedCertificateExtensions.Contains(extension.ToLowerInvariant());
+    }
+
+    private void RemoveExistingDocuments(LeaveRequest request)
+    {
+        if (request.Documents.Count == 0) return;
+
+        var webRoot = GetWebRootPath();
+        foreach (var document in request.Documents.ToList())
+        {
+            var physicalPath = Path.Combine(webRoot, document.StoredFilePath.Replace('/', Path.DirectorySeparatorChar));
+            try
+            {
+                if (System.IO.File.Exists(physicalPath))
+                {
+                    System.IO.File.Delete(physicalPath);
+                }
+            }
+            catch
+            {
+                // ignore IO errors when cleaning up old files
+            }
+
+            _db.LeaveDocuments.Remove(document);
+        }
+
+        request.Documents.Clear();
+    }
+
+    private async Task<string> SaveCertificateFileAsync(int requestId, IFormFile file)
+    {
+        var extension = Path.GetExtension(file.FileName);
+        if (!string.IsNullOrWhiteSpace(extension))
+        {
+            extension = new string(extension.Take(10).ToArray());
+        }
+        else
+        {
+            extension = string.Empty;
+        }
+
+        var uniqueName = $"{Guid.NewGuid():N}{extension}";
+        var relativePath = Path.Combine("uploads", "leave-documents", requestId.ToString(), uniqueName)
+            .Replace('\\', '/');
+
+        var physicalPath = Path.Combine(GetWebRootPath(), relativePath.Replace('/', Path.DirectorySeparatorChar));
+        var directory = Path.GetDirectoryName(physicalPath);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        await using var stream = System.IO.File.Create(physicalPath);
+        await file.CopyToAsync(stream);
+
+        return relativePath;
+    }
+
+    private string GetWebRootPath()
+    {
+        if (!string.IsNullOrWhiteSpace(_environment.WebRootPath))
+        {
+            return _environment.WebRootPath!;
+        }
+
+        var path = Path.Combine(AppContext.BaseDirectory, "wwwroot");
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
+    private static string SanitizeOriginalFileName(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return "document";
+        }
+
+        var name = Path.GetFileName(fileName);
+        if (name.Length <= 256)
+        {
+            return name;
+        }
+
+        return name[^256..];
     }
 }

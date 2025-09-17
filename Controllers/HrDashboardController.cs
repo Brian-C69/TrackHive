@@ -13,6 +13,10 @@ public sealed class HrDashboardController : Controller
 {
     private readonly AppDbContext _db;
     private readonly EmailService _email;
+    private const string LeaveActionMessageKey = "LeaveActionMessage";
+    private const string LeaveActionErrorKey   = "LeaveActionError";
+    private const string CertificateActionMessageKey = "CertificateActionMessage";
+    private const string CertificateActionErrorKey   = "CertificateActionError";
     public HrDashboardController(AppDbContext db, EmailService email)
     {
         _db = db;
@@ -127,13 +131,13 @@ public sealed class HrDashboardController : Controller
 
         if (request is null || request.User is null || request.User.OrganizationId != hr.OrganizationId)
         {
-            TempData["LeaveActionError"] = "Leave request not found.";
+            TempData[LeaveActionErrorKey] = "Leave request not found.";
             return RedirectToAction(nameof(Index));
         }
 
         if (request.Status != LeaveRequestStatus.Pending)
         {
-            TempData["LeaveActionError"] = "This leave request has already been processed.";
+            TempData[LeaveActionErrorKey] = "This leave request has already been processed.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -157,13 +161,18 @@ public sealed class HrDashboardController : Controller
         var available = balance.AnnualEntitlement - balance.UsedDays - pendingDays;
         if (available < 0)
         {
-            TempData["LeaveActionError"] = $"{request.User.Name} has exceeded their entitlement.";
+            TempData[LeaveActionErrorKey] = $"{request.User.Name} has exceeded their entitlement.";
             return RedirectToAction(nameof(Index));
         }
 
-        request.Status = LeaveRequestStatus.Approved;
-        request.ReviewedAt = DateTimeOffset.UtcNow;
+        var now = DateTimeOffset.UtcNow;
+        request.ReviewedAt = now;
         request.ReviewedById = hr.Id;
+
+        var requiresCertificate = request.Type.RequiresMedicalCertificate();
+        request.Status = requiresCertificate
+            ? LeaveRequestStatus.ApprovedAwaitingCertificate
+            : LeaveRequestStatus.Approved;
 
         balance.UsedDays += request.TotalDays;
         balance.UpdatedAt = DateTimeOffset.UtcNow;
@@ -171,11 +180,14 @@ public sealed class HrDashboardController : Controller
         try
         {
             await _db.SaveChangesAsync();
-            TempData["LeaveActionMessage"] = $"Approved {request.User.Name}'s leave ({request.TotalDays} day(s)).";
+            var message = requiresCertificate
+                ? $"Approved {request.User.Name}'s leave ({request.TotalDays} day(s)). Awaiting medical certificate."
+                : $"Approved {request.User.Name}'s leave ({request.TotalDays} day(s)).";
+            TempData[LeaveActionMessageKey] = message;
         }
         catch (DbUpdateException)
         {
-            TempData["LeaveActionError"] = "We couldn't approve this request. Please try again.";
+            TempData[LeaveActionErrorKey] = "We couldn't approve this request. Please try again.";
         }
 
         return RedirectToAction(nameof(Index));
@@ -195,13 +207,13 @@ public sealed class HrDashboardController : Controller
 
         if (request is null || request.User is null || request.User.OrganizationId != hr.OrganizationId)
         {
-            TempData["LeaveActionError"] = "Leave request not found.";
+            TempData[LeaveActionErrorKey] = "Leave request not found.";
             return RedirectToAction(nameof(Index));
         }
 
         if (request.Status != LeaveRequestStatus.Pending)
         {
-            TempData["LeaveActionError"] = "This leave request has already been processed.";
+            TempData[LeaveActionErrorKey] = "This leave request has already been processed.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -212,11 +224,93 @@ public sealed class HrDashboardController : Controller
         try
         {
             await _db.SaveChangesAsync();
-            TempData["LeaveActionMessage"] = $"Rejected {request.User.Name}'s leave request.";
+            TempData[LeaveActionMessageKey] = $"Rejected {request.User.Name}'s leave request.";
         }
         catch (DbUpdateException)
         {
-            TempData["LeaveActionError"] = "We couldn't reject this request. Please try again.";
+            TempData[LeaveActionErrorKey] = "We couldn't reject this request. Please try again.";
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApproveCertificate(int id)
+    {
+        var hr = await GetCurrentUserAsync();
+        if (hr is null) return RedirectToAction("Login", "Auth");
+        if (hr.MustChangePassword) return RedirectToAction("ChangePassword", "Auth");
+
+        var request = await _db.LeaveRequests
+            .Include(r => r.User)
+            .FirstOrDefaultAsync(r => r.Id == id);
+
+        if (request is null || request.User is null || request.User.OrganizationId != hr.OrganizationId)
+        {
+            TempData[CertificateActionErrorKey] = "Leave request not found.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (request.Status != LeaveRequestStatus.AwaitingCertificateReview)
+        {
+            TempData[CertificateActionErrorKey] = "This request is not awaiting certificate review.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        request.Status = LeaveRequestStatus.Approved;
+        request.ReviewedAt = DateTimeOffset.UtcNow;
+        request.ReviewedById = hr.Id;
+
+        try
+        {
+            await _db.SaveChangesAsync();
+            TempData[CertificateActionMessageKey] = $"Approved medical certificate for {request.User.Name}.";
+        }
+        catch (DbUpdateException)
+        {
+            TempData[CertificateActionErrorKey] = "We couldn't approve this certificate. Please try again.";
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RejectCertificate(int id)
+    {
+        var hr = await GetCurrentUserAsync();
+        if (hr is null) return RedirectToAction("Login", "Auth");
+        if (hr.MustChangePassword) return RedirectToAction("ChangePassword", "Auth");
+
+        var request = await _db.LeaveRequests
+            .Include(r => r.User)
+            .FirstOrDefaultAsync(r => r.Id == id);
+
+        if (request is null || request.User is null || request.User.OrganizationId != hr.OrganizationId)
+        {
+            TempData[CertificateActionErrorKey] = "Leave request not found.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (request.Status != LeaveRequestStatus.AwaitingCertificateReview)
+        {
+            TempData[CertificateActionErrorKey] = "This request is not awaiting certificate review.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        request.Status = LeaveRequestStatus.CertificateRejected;
+        request.ReviewedAt = DateTimeOffset.UtcNow;
+        request.ReviewedById = hr.Id;
+
+        try
+        {
+            await _db.SaveChangesAsync();
+            TempData[CertificateActionMessageKey] = $"Requested a new medical certificate from {request.User.Name}.";
+        }
+        catch (DbUpdateException)
+        {
+            TempData[CertificateActionErrorKey] = "We couldn't update this certificate review. Please try again.";
         }
 
         return RedirectToAction(nameof(Index));
@@ -255,6 +349,21 @@ public sealed class HrDashboardController : Controller
             .Where(r => employeeIds.Contains(r.UserId) && r.Status == LeaveRequestStatus.Pending)
             .OrderBy(r => r.StartDate)
             .ThenBy(r => r.EndDate)
+            .ToListAsync();
+
+        var certificatePendingRequests = await _db.LeaveRequests
+            .AsNoTracking()
+            .Include(r => r.User)
+            .Include(r => r.Documents)
+            .Where(r => employeeIds.Contains(r.UserId) && r.Status == LeaveRequestStatus.AwaitingCertificateReview)
+            .OrderBy(r => r.StartDate)
+            .ThenBy(r => r.EndDate)
+            .ToListAsync();
+
+        var awaitingEmployeeCertificates = await _db.LeaveRequests
+            .AsNoTracking()
+            .Include(r => r.User)
+            .Where(r => employeeIds.Contains(r.UserId) && r.Status == LeaveRequestStatus.ApprovedAwaitingCertificate)
             .ToListAsync();
 
         var pendingTotals = pendingRequests
@@ -301,6 +410,39 @@ public sealed class HrDashboardController : Controller
             })
             .ToList();
 
+        var certificateViewModels = certificatePendingRequests
+            .Select(r =>
+            {
+                var documents = r.Documents
+                    .OrderBy(d => d.UploadedAt)
+                    .Select(d => new LeaveDocumentViewModel
+                    {
+                        Id = d.Id,
+                        FileName = d.OriginalFileName,
+                        UploadedAt = d.UploadedAt,
+                        DownloadAction = Url.Action("Download", "LeaveDocuments", new { id = d.Id }) ?? string.Empty
+                    })
+                    .ToList();
+
+                var submittedAt = documents.Count > 0
+                    ? documents.Max(d => d.UploadedAt)
+                    : r.CreatedAt;
+
+                return new LeaveCertificateReviewViewModel
+                {
+                    RequestId = r.Id,
+                    EmployeeName = r.User?.Name ?? "Employee",
+                    Type = r.Type,
+                    StartDate = r.StartDate,
+                    EndDate = r.EndDate,
+                    TotalDays = r.TotalDays,
+                    Reason = r.Reason,
+                    SubmittedAt = submittedAt,
+                    Documents = documents
+                };
+            })
+            .ToList();
+
         var notifications = new List<DashboardNotificationViewModel>();
         var employeeNameLookup = employees.ToDictionary(e => e.Id, e => e.Name);
 
@@ -316,6 +458,38 @@ public sealed class HrDashboardController : Controller
             });
         }
 
+        if (certificateViewModels.Count > 0)
+        {
+            var latestSubmission = certificatePendingRequests
+                .SelectMany(r => r.Documents.Select(d => d.UploadedAt))
+                .DefaultIfEmpty(DateTimeOffset.UtcNow)
+                .Max();
+
+            notifications.Add(new DashboardNotificationViewModel
+            {
+                Category = "Leave",
+                Title = "Certificates pending review",
+                Message = $"You have {certificateViewModels.Count} medical certificate(s) awaiting approval.",
+                CreatedAt = latestSubmission
+            });
+        }
+
+        if (awaitingEmployeeCertificates.Count > 0)
+        {
+            var mostRecentApproval = awaitingEmployeeCertificates
+                .Select(r => r.ReviewedAt ?? r.CreatedAt)
+                .DefaultIfEmpty(DateTimeOffset.UtcNow)
+                .Max();
+
+            notifications.Add(new DashboardNotificationViewModel
+            {
+                Category = "Leave",
+                Title = "Waiting on medical certificates",
+                Message = $"{awaitingEmployeeCertificates.Count} approved leave(s) still need employee documents.",
+                CreatedAt = mostRecentApproval
+            });
+        }
+
         if (employeeIds.Count > 0)
         {
             var statusHistoryCutoff = DateTimeOffset.UtcNow.AddDays(-7);
@@ -323,7 +497,9 @@ public sealed class HrDashboardController : Controller
                 .AsNoTracking()
                 .Include(r => r.User)
                 .Where(r => employeeIds.Contains(r.UserId)
-                    && r.Status != LeaveRequestStatus.Pending
+                    && (r.Status == LeaveRequestStatus.Approved
+                        || r.Status == LeaveRequestStatus.Rejected
+                        || r.Status == LeaveRequestStatus.CertificateRejected)
                     && r.ReviewedAt != null
                     && r.ReviewedAt >= statusHistoryCutoff)
                 .OrderByDescending(r => r.ReviewedAt)
@@ -332,14 +508,23 @@ public sealed class HrDashboardController : Controller
 
             foreach (var decision in recentDecisions)
             {
-                var status = decision.Status == LeaveRequestStatus.Approved ? "approved" : "rejected";
+                var status = decision.Status switch
+                {
+                    LeaveRequestStatus.Approved => "approved",
+                    LeaveRequestStatus.CertificateRejected => "certificate rejected",
+                    _ => "rejected"
+                };
                 var reviewedAt = decision.ReviewedAt!.Value;
                 var employeeName = decision.User?.Name ?? "Employee";
+                var message = decision.Status == LeaveRequestStatus.CertificateRejected
+                    ? $"{employeeName}'s medical certificate was rejected on {reviewedAt.ToLocalTime():MMM d}."
+                    : $"{employeeName}'s {decision.TotalDays} day(s) of leave were {status} on {reviewedAt.ToLocalTime():MMM d}.";
+
                 notifications.Add(new DashboardNotificationViewModel
                 {
                     Category = "Leave",
                     Title = $"{employeeName}'s leave {status}",
-                    Message = $"{employeeName}'s {decision.TotalDays} day(s) of leave were {status} on {reviewedAt.ToLocalTime():MMM d}.",
+                    Message = message,
                     CreatedAt = reviewedAt
                 });
             }
@@ -426,6 +611,7 @@ public sealed class HrDashboardController : Controller
             OrganizationName = org?.Name ?? "Organization",
             Invite = invite,
             PendingLeaveRequests = pendingViewModels,
+            PendingCertificateRequests = certificateViewModels,
             LeaveSummaries = leaveSummaries,
             Notifications = orderedNotifications
         };

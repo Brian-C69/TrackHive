@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 namespace TrackHive.Models;
 
@@ -13,6 +14,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<LeaveRequest> LeaveRequests => Set<LeaveRequest>();
     public DbSet<LeaveBalance> LeaveBalances => Set<LeaveBalance>();
     public DbSet<PayrollRecord> PayrollRecords => Set<PayrollRecord>();
+    public DbSet<LeaveDocument> LeaveDocuments => Set<LeaveDocument>();
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -81,6 +83,27 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<LeaveRequest>()
             .Property(l => l.EndDate)
             .HasColumnType("date");
+
+        modelBuilder.Entity<LeaveRequest>()
+            .HasMany(l => l.Documents)
+            .WithOne(d => d.LeaveRequest)
+            .HasForeignKey(d => d.LeaveRequestId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<LeaveDocument>()
+            .Property(d => d.OriginalFileName)
+            .HasMaxLength(256);
+
+        modelBuilder.Entity<LeaveDocument>()
+            .Property(d => d.StoredFilePath)
+            .HasMaxLength(260);
+
+        modelBuilder.Entity<LeaveDocument>()
+            .Property(d => d.ContentType)
+            .HasMaxLength(128);
+
+        modelBuilder.Entity<LeaveDocument>()
+            .HasIndex(d => d.LeaveRequestId);
 
         modelBuilder.Entity<PayrollRecord>()
             .HasIndex(p => new { p.UserId, p.Year, p.Month })
