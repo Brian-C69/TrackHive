@@ -1,40 +1,100 @@
-﻿@{
-    ViewData["Title"] = "Welcome to TrackHive";
+@{
+    ViewData["Title"] = "TrackHive – Smart HR Starts Here";
 }
-<div class="row justify-content-center">
-    <div class="col-lg-10 col-xl-9">
-        <div class="p-4 p-md-5 bg-white border rounded-4 shadow-sm">
-            <h1 class="display-6 mb-3">All-in-one Attendance & HR Suite</h1>
-            <p class="lead text-secondary mb-4">
-                TrackHive helps your team manage attendance, advanced reporting, payroll & salary calculation,
-                and leave/medical leave workflows — built with ASP.NET 9 + Bootstrap.
-            </p>
 
-            <div class="row g-3 mb-4">
-                <div class="col-md-4">
-                    <div class="border rounded-3 p-3 h-100">
-                        <div class="fw-semibold mb-1">IT</div>
-                        <div class="text-secondary small">Creates organization, configures SMTP, invites HR.</div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="border rounded-3 p-3 h-100">
-                        <div class="fw-semibold mb-1">HR</div>
-                        <div class="text-secondary small">Sets policies, invites employees, manages leave/payroll.</div>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="border rounded-3 p-3 h-100">
-                        <div class="fw-semibold mb-1">Employee</div>
-                        <div class="text-secondary small">Clocks in/out, views balances, requests leave.</div>
+<section class="py-5 bg-body-tertiary">
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-xl-10">
+                <div class="bg-white shadow-lg rounded-4 p-4 p-md-5 position-relative overflow-hidden">
+                    <div class="position-absolute top-0 end-0 translate-middle opacity-25 d-none d-md-block" style="width: 280px; height: 280px; background: radial-gradient(circle at center, rgba(255, 208, 0, 0.35), transparent 65%);"></div>
+                    <div class="position-relative">
+                        <span class="badge bg-warning text-dark rounded-pill px-3 py-2 mb-3">Smart HR Platform</span>
+                        <h1 class="display-4 fw-bold mb-3">🐝 TrackHive – Smart HR Starts Here</h1>
+                        <p class="lead text-secondary mb-4">
+                            “Empower Your Workforce. Track Smarter with TrackHive.”<br />
+                            All-in-one attendance, leave, and payroll automation – built for modern HR teams.
+                        </p>
+                        <div class="d-flex flex-column flex-md-row gap-3">
+                            <a class="btn btn-primary btn-lg px-4" asp-controller="IT" asp-action="CreateOrg">Get Started Now</a>
+                            <a class="btn btn-outline-dark btn-lg px-4" href="mailto:hello@trackhive.com">Schedule a Demo</a>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="d-flex gap-3">
-                <a class="btn btn-primary btn-lg" asp-controller="IT" asp-action="CreateOrg">Get started (IT) →</a>
-                <a class="btn btn-outline-secondary btn-lg disabled" href="#" aria-disabled="true">Learn more (coming soon)</a>
+        <div class="row justify-content-center mt-5 pt-lg-4">
+            <div class="col-xl-10">
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <span class="badge bg-dark-subtle text-dark-emphasis rounded-pill px-3 py-2">🚀 Key Features</span>
+                    <h2 class="h3 mb-0">Everything modern HR teams need to operate smarter</h2>
+                </div>
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                    <div class="col">
+                        <div class="h-100 border rounded-4 p-4 bg-white">
+                            <div class="fs-3">✅</div>
+                            <h3 class="h5 mt-3">Smart Attendance Tracking</h3>
+                            <p class="text-secondary mb-0">Automated check-in/out with real-time insights and lateness detection.</p>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="h-100 border rounded-4 p-4 bg-white">
+                            <div class="fs-3">📅</div>
+                            <h3 class="h5 mt-3">Leave Management Made Easy</h3>
+                            <p class="text-secondary mb-0">Employees apply, HR approves — all leave entitlements tracked and updated live.</p>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="h-100 border rounded-4 p-4 bg-white">
+                            <div class="fs-3">💸</div>
+                            <h3 class="h5 mt-3">Integrated Payroll Calculator</h3>
+                            <p class="text-secondary mb-0">Accurate salary generation based on attendance, deductions, and overtime.</p>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="h-100 border rounded-4 p-4 bg-white">
+                            <div class="fs-3">📊</div>
+                            <h3 class="h5 mt-3">Visual Dashboards</h3>
+                            <p class="text-secondary mb-0">Get a bird’s eye view of your workforce – attendance rates, leave stats, payroll overview.</p>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="h-100 border rounded-4 p-4 bg-white">
+                            <div class="fs-3">📥</div>
+                            <h3 class="h5 mt-3">PDF Payslip &amp; Reports</h3>
+                            <p class="text-secondary mb-0">One-click payroll exports and official salary slips for every employee.</p>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="h-100 border rounded-4 p-4 bg-white">
+                            <div class="fs-3">🔐</div>
+                            <h3 class="h5 mt-3">Role-Based Access Control</h3>
+                            <p class="text-secondary mb-0">HR, Admin, and Employee accounts — each with the tools they need.</p>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="h-100 border rounded-4 p-4 bg-white">
+                            <div class="fs-3">📧</div>
+                            <h3 class="h5 mt-3">Notifications &amp; Reminders</h3>
+                            <p class="text-secondary mb-0">Leave status, late arrival alerts, monthly reports – all automated.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row justify-content-center mt-5 pt-4">
+            <div class="col-xl-8">
+                <div class="text-center bg-white rounded-4 shadow-sm p-4 p-md-5">
+                    <h2 class="h3 fw-semibold mb-3">✨ Start Managing Your Team Like Never Before</h2>
+                    <p class="text-secondary mb-4">Bring every attendance log, leave request, and payroll cycle into one intuitive workspace.</p>
+                    <div class="d-flex flex-column flex-md-row justify-content-center gap-3">
+                        <a class="btn btn-primary btn-lg px-4" asp-controller="IT" asp-action="CreateOrg">Get Started Now</a>
+                        <a class="btn btn-outline-dark btn-lg px-4" href="mailto:hello@trackhive.com">Schedule a Demo</a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</div>
+</section>
