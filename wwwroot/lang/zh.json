@@ -1,5 +1,66 @@
 {
   "code": "zh",
   "name": "Mandarin",
-  "translations": {}
+  "translations": {
+    "onboarding": {
+      "heroTitle": "欢迎加入 TrackHive",
+      "heroSubtitle": "本入职指南将向您介绍公司的文化、工作期望以及帮助您取得成功的资源。",
+      "languageLabel": "显示语言",
+      "valuesTitle": "我们的公司价值观",
+      "valuesDescription": "这些原则指导着我们如何合作以及服务客户。",
+      "values": [
+        {
+          "title": "诚信至上",
+          "description": "我们以诚实行事，信守承诺，并对自己的决定负责。"
+        },
+        {
+          "title": "以人为本的同理心",
+          "description": "我们认真倾听同事和客户的需求。"
+        },
+        {
+          "title": "持续改进",
+          "description": "我们不断尝试、学习，并每天优化工作方式。"
+        }
+      ],
+      "conductTitle": "行为准则",
+      "conductDescription": "与团队合作时请牢记以下规定。",
+      "conduct": [
+        {
+          "title": "尊重的沟通",
+          "description": "使用包容性的语言，守时并保持专业交流。"
+        },
+        {
+          "title": "保护机密数据",
+          "description": "不得在授权渠道之外分享客户或员工信息。"
+        },
+        {
+          "title": "及早寻求帮助",
+          "description": "尽早提出阻碍，以便我们一起解决。"
+        }
+      ],
+      "safetyTitle": "安全与身心健康",
+      "safetyDescription": "我们重视您的身心健康——如有不安全的情况请立即告知。",
+      "safety": [
+        {
+          "title": "工作站人体工学",
+          "description": "调整您的工作站，并且每小时稍作休息。"
+        },
+        {
+          "title": "安全实践",
+          "description": "离开时锁定设备，并立即报告可疑活动。"
+        },
+        {
+          "title": "应急程序",
+          "description": "遵循大楼疏散方案，并在演练期间向负责人报到。"
+        }
+      ],
+      "nextStepsTitle": "接下来的步骤",
+      "nextSteps": [
+        "在第一周与导师会面，了解岗位期望。",
+        "完成学习平台中列出的必修培训课程。",
+        "阅读共享云盘中的项目文档。",
+        "加入 #welcome 频道，向团队做自我介绍。"
+      ]
+    }
+  }
 }
