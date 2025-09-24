@@ -15,7 +15,7 @@ using Microsoft.Extensions.Options;
 using Stripe;
 using Stripe.Checkout;
 using TrackHive.Models;
-using TrackHive.Services;
+using BillingService = TrackHive.Services.BillingService;
 
 namespace TrackHive.Controllers;
 
@@ -171,14 +171,14 @@ public sealed class BillingController : Controller
         {
             switch (stripeEvent.Type)
             {
-                case Events.CheckoutSessionCompleted:
+                case EventTypes.CheckoutSessionCompleted:
                     if (stripeEvent.Data.Object is Session checkoutSession)
                     {
                         await HandleCheckoutSessionAsync(checkoutSession);
                     }
                     break;
-                case Events.CustomerSubscriptionCreated:
-                case Events.CustomerSubscriptionUpdated:
+                case EventTypes.CustomerSubscriptionCreated:
+                case EventTypes.CustomerSubscriptionUpdated:
                     if (stripeEvent.Data.Object is Subscription subscription)
                     {
                         await HandleSubscriptionAsync(subscription);
@@ -225,7 +225,7 @@ public sealed class BillingController : Controller
         DateTime? renewsAt = null;
         if (session.Subscription is Subscription subscription)
         {
-            renewsAt = NormalizeToUtc(subscription.CurrentPeriodEnd);
+            renewsAt = NormalizeToUtc(GetSubscriptionPeriodEnd(subscription));
         }
 
         var vm = new BillingStatusViewModel
@@ -292,7 +292,7 @@ public sealed class BillingController : Controller
             plan,
             session.CustomerId,
             subscription?.Id ?? subscriptionId,
-            subscription?.CurrentPeriodEnd);
+            GetSubscriptionPeriodEnd(subscription));
     }
 
     private async Task HandleSubscriptionAsync(Subscription subscription)
@@ -312,7 +312,7 @@ public sealed class BillingController : Controller
             plan,
             subscription.CustomerId,
             subscription.Id,
-            subscription.CurrentPeriodEnd);
+            GetSubscriptionPeriodEnd(subscription));
     }
 
     private async Task UpdateOrganizationSubscriptionAsync(
@@ -421,6 +421,23 @@ public sealed class BillingController : Controller
         }
 
         return fallback;
+    }
+
+    private static DateTime? GetSubscriptionPeriodEnd(Subscription? subscription)
+    {
+        var item = subscription?.Items?.Data?.FirstOrDefault();
+        if (item is null)
+        {
+            return null;
+        }
+
+        var periodEnd = item.CurrentPeriodEnd;
+        if (periodEnd <= DateTime.UnixEpoch)
+        {
+            return null;
+        }
+
+        return periodEnd;
     }
 
     private int GetOrgId()
