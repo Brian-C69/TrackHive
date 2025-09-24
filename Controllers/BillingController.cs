@@ -99,18 +99,10 @@ public sealed class BillingController : Controller
 
         try
         {
-            var successUrl = Url.Action(nameof(Success), "Billing", values: null, protocol: Request.Scheme, host: Request.Host.ToString());
-            if (string.IsNullOrWhiteSpace(successUrl))
-            {
-                throw new InvalidOperationException("Unable to resolve the success URL.");
-            }
+            var successUrl = BuildCheckoutRedirectUrl(Url.Action(nameof(Success), "Billing"));
             successUrl = AppendCheckoutSessionId(successUrl);
 
-            var cancelUrl = Url.Action(nameof(Failed), "Billing", new { plan }, Request.Scheme, Request.Host.ToString());
-            if (string.IsNullOrWhiteSpace(cancelUrl))
-            {
-                throw new InvalidOperationException("Unable to resolve the cancel URL.");
-            }
+            var cancelUrl = BuildCheckoutRedirectUrl(Url.Action(nameof(Failed), "Billing", new { plan }));
 
             var email = User.FindFirstValue(ClaimTypes.Email);
             var session = await _billing.CreateCheckoutSessionAsync(org.Id, plan, email, successUrl, cancelUrl);
@@ -356,6 +348,60 @@ public sealed class BillingController : Controller
 
         var separator = withoutFragment.Contains('?', StringComparison.Ordinal) ? '&' : '?';
         return $"{withoutFragment}{separator}session_id={{CHECKOUT_SESSION_ID}}{fragment}";
+    }
+
+    private string BuildCheckoutRedirectUrl(string? pathOrAbsolute)
+    {
+        if (string.IsNullOrWhiteSpace(pathOrAbsolute))
+        {
+            throw new InvalidOperationException("Unable to resolve the checkout redirect URL.");
+        }
+
+        if (Uri.TryCreate(pathOrAbsolute, UriKind.Absolute, out var absolute))
+        {
+            return absolute.ToString();
+        }
+
+        var baseUri = ResolveCheckoutBaseUri();
+        var relative = pathOrAbsolute.TrimStart('/');
+        return new Uri(baseUri, relative).ToString();
+    }
+
+    private Uri ResolveCheckoutBaseUri()
+    {
+        if (!string.IsNullOrWhiteSpace(_stripeOptions.CheckoutRedirectBaseUrl))
+        {
+            var configuredBase = EnsureTrailingSlash(_stripeOptions.CheckoutRedirectBaseUrl);
+            if (!Uri.TryCreate(configuredBase, UriKind.Absolute, out var baseUri))
+            {
+                throw new InvalidOperationException("Configured Stripe checkout redirect base URL is invalid.");
+            }
+
+            return baseUri;
+        }
+
+        var request = HttpContext?.Request
+            ?? throw new InvalidOperationException("Unable to determine the current HTTP request.");
+
+        if (string.IsNullOrEmpty(request.Scheme) || !request.Host.HasValue)
+        {
+            throw new InvalidOperationException("Unable to determine the current request host.");
+        }
+
+        var hostUrl = EnsureTrailingSlash($"{request.Scheme}://{request.Host.Value}");
+        return new Uri(hostUrl, UriKind.Absolute);
+    }
+
+    private static string EnsureTrailingSlash(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            throw new ArgumentException("URL cannot be null or whitespace.", nameof(url));
+        }
+
+        return url.EndsWith('/', StringComparison.Ordinal)
+            ? url
+            : url + "/";
     }
 
     private async Task HandleCheckoutSessionAsync(Session session)
