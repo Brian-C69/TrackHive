@@ -1,0 +1,25 @@
+@model TrackHive.Models.BillingStatusViewModel
+@{
+    Layout = "~/Views/Shared/_Layout.App.cshtml";
+    var planName = Model.Plan.GetDisplayName();
+    var planTagline = Model.Plan.GetTagline();
+}
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-10 col-xl-8">
+        <div class="card shadow-sm border-danger">
+            <div class="card-body p-5 text-center">
+                <i class="bi bi-x-circle-fill text-danger display-4 mb-3" aria-hidden="true"></i>
+                <h1 class="h3 mb-3">@Model.Title</h1>
+                <p class="lead mb-3">@planName was not activated.</p>
+                <p class="text-secondary mb-4">@Model.Message</p>
+                <p class="text-secondary small mb-4">@planTagline</p>
+
+                <div class="d-grid d-sm-flex justify-content-center gap-2 mt-4">
+                    <a class="btn btn-primary" asp-action="Upgrade">Try checkout again</a>
+                    <a class="btn btn-outline-secondary" asp-controller="Dashboard" asp-action="Index">Back to invites</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
