@@ -42,7 +42,7 @@ public static class SubscriptionPlanExtensions
             [SubscriptionPlan.Enterprise] = new(
                 "Enterprise",
                 "Enterprise-grade compliance and onboarding at scale.",
-                "Custom pricing",
+                "$399/mo",
                 new[]
                 {
                     "Dedicated success manager",

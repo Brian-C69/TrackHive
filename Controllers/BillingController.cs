@@ -481,6 +481,11 @@ public sealed class BillingController : Controller
             return fallback;
         }
 
+        if (TryGetPlan(subscription.Metadata, out var planFromMetadata))
+        {
+            return planFromMetadata;
+        }
+
         var priceId = subscription.Items?.Data?.FirstOrDefault()?.Price?.Id;
         return ResolvePlanFromPriceId(priceId, fallback);
     }

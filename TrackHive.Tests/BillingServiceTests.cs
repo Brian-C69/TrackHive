@@ -1,6 +1,6 @@
 using System;
 using System.Reflection;
-using System.Threading.Tasks;
+using System.Runtime.ExceptionServices;
 
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -8,71 +8,73 @@ using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using TrackHive.Models;
 using TrackHive.Services;
+using Stripe.Checkout;
 
 namespace TrackHive.Tests;
 
 [TestClass]
 public class BillingServiceTests
 {
-    [TestMethod]
-    public async Task ResolvePriceIdAsync_ReturnsConfiguredId_ForConfiguredPlan()
+    [DataTestMethod]
+    [DataRow(SubscriptionPlan.Starter, 99_00L, "Starter")]
+    [DataRow(SubscriptionPlan.Pro, 199_00L, "Pro")]
+    [DataRow(SubscriptionPlan.Enterprise, 399_00L, "Enterprise")]
+    public void CreateSubscriptionLineItem_ConfiguresExpectedPricing(
+        SubscriptionPlan plan,
+        long expectedAmount,
+        string expectedName)
     {
-        var service = CreateService("price_123");
+        var service = CreateService();
 
-        var priceId = await InvokeResolvePriceIdAsync(service, SubscriptionPlan.Starter);
+        var lineItem = InvokeCreateSubscriptionLineItem(service, plan);
 
-        Assert.AreEqual("price_123", priceId);
+        Assert.AreEqual(1, lineItem.Quantity);
+        Assert.IsNotNull(lineItem.PriceData);
+        Assert.AreEqual("usd", lineItem.PriceData.Currency);
+        Assert.AreEqual(expectedAmount, lineItem.PriceData.UnitAmount);
+        Assert.IsNotNull(lineItem.PriceData.ProductData);
+        Assert.AreEqual(expectedName, lineItem.PriceData.ProductData.Name);
+        Assert.IsNotNull(lineItem.PriceData.Recurring);
+        Assert.AreEqual("month", lineItem.PriceData.Recurring.Interval);
     }
 
     [TestMethod]
-    public async Task ResolvePriceIdAsync_ReturnsConfiguredId_ForDifferentPlans()
+    public void CreateSubscriptionLineItem_ThrowsForUnsupportedPlan()
     {
-        var service = CreateService("price_starter");
+        var service = CreateService();
 
-        var starter = await InvokeResolvePriceIdAsync(service, SubscriptionPlan.Starter);
-        var pro = await InvokeResolvePriceIdAsync(service, SubscriptionPlan.Pro);
-        var enterprise = await InvokeResolvePriceIdAsync(service, SubscriptionPlan.Enterprise);
-
-        Assert.AreEqual("price_starter", starter);
-        Assert.AreEqual("price_pro", pro);
-        Assert.AreEqual("price_enterprise", enterprise);
+        Assert.ThrowsException<InvalidOperationException>(
+            () => InvokeCreateSubscriptionLineItem(service, SubscriptionPlan.Free));
     }
 
-    [TestMethod]
-    public async Task ResolvePriceIdAsync_Throws_WhenPriceNotConfigured()
-    {
-        var service = CreateService(string.Empty);
-
-        await Assert.ThrowsExceptionAsync<InvalidOperationException>(
-            () => InvokeResolvePriceIdAsync(service, SubscriptionPlan.Starter));
-    }
-
-    private static BillingService CreateService(string starterValue)
+    private static BillingService CreateService()
     {
         var options = Options.Create(new StripeOptions
         {
-            SecretKey = "sk_test_123",
-            Prices = new StripeOptions.StripePriceOptions
-            {
-                Starter = starterValue,
-                Pro = "price_pro",
-                Enterprise = "price_enterprise"
-            }
+            SecretKey = "sk_test_123"
         });
 
         return new BillingService(options, NullLogger<BillingService>.Instance);
     }
 
-    private static Task<string> InvokeResolvePriceIdAsync(BillingService service, SubscriptionPlan plan)
+    private static SessionLineItemOptions InvokeCreateSubscriptionLineItem(
+        BillingService service,
+        SubscriptionPlan plan)
     {
         var method = typeof(BillingService).GetMethod(
-            "ResolvePriceIdAsync",
+            "CreateSubscriptionLineItem",
             BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("ResolvePriceIdAsync method not found.");
+            ?? throw new InvalidOperationException("CreateSubscriptionLineItem method not found.");
 
-        var task = method.Invoke(service, new object[] { plan }) as Task<string>
-            ?? throw new InvalidOperationException("ResolvePriceIdAsync did not return a Task<string>.");
-
-        return task;
+        try
+        {
+            return method.Invoke(service, new object[] { plan }) as SessionLineItemOptions
+                ?? throw new InvalidOperationException("CreateSubscriptionLineItem did not return a SessionLineItemOptions.");
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
+        }
     }
 }
