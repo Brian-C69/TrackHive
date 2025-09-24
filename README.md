@@ -134,6 +134,14 @@ For LAN/Internet access during dev, bind Kestrel to `0.0.0.0` and open/forward t
 
 ---
 
+## 🧹 Data Retention
+
+- Organizations on the **Free plan** only retain the most recent 90 days of attendance, leave requests (and their documents), and payroll records.
+- A background cleanup service runs daily to remove data outside this window, and dashboards/payroll history endpoints filter out older records for Free tenants.
+- Paid plans keep their full history untouched.
+
+---
+
 ## 🗂️ Project Structure
 
 ```

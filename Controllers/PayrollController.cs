@@ -32,6 +32,7 @@ public sealed class PayrollController : Controller
         if (hr.MustChangePassword) return RedirectToAction("ChangePassword", "Auth");
 
         var employees = await LoadEmployeesAsync(hr.OrganizationId);
+        var plan = await GetOrganizationPlanAsync(hr.OrganizationId);
         var now = DateTime.UtcNow;
         var form = new PayrollCalculationForm
         {
@@ -50,7 +51,7 @@ public sealed class PayrollController : Controller
         if (form.SelectedEmployeeId.HasValue && employees.Any(e => e.Id == form.SelectedEmployeeId.Value))
         {
             result = await BuildCalculationAsync(hr.OrganizationId, form.SelectedEmployeeId.Value, form.Year, form.Month, form.ManualDeductions, form.AdditionalOvertimeHours);
-            history = await LoadHistoryAsync(form.SelectedEmployeeId.Value);
+            history = await LoadHistoryAsync(form.SelectedEmployeeId.Value, plan);
             if (result is not null && result.MonthlySalary <= 0)
             {
                 alertMessage = "This employee has no monthly salary on file. Update their profile to ensure accurate payroll.";
@@ -84,6 +85,7 @@ public sealed class PayrollController : Controller
         var form = postedModel.Form ?? new PayrollCalculationForm();
         postedModel.Form = form;
         var employees = await LoadEmployeesAsync(hr.OrganizationId);
+        var plan = await GetOrganizationPlanAsync(hr.OrganizationId);
         PayrollCalculationResult? result = null;
         IReadOnlyList<PastPayrollRecordViewModel> history = Array.Empty<PastPayrollRecordViewModel>();
         string? alertMessage = null;
@@ -134,7 +136,7 @@ public sealed class PayrollController : Controller
                     alertType = "success";
                 }
 
-                history = await LoadHistoryAsync(result.EmployeeId);
+                history = await LoadHistoryAsync(result.EmployeeId, plan);
 
                 if (result.MonthlySalary <= 0)
                 {
@@ -145,7 +147,7 @@ public sealed class PayrollController : Controller
         }
         else if (form.SelectedEmployeeId.HasValue)
         {
-            history = await LoadHistoryAsync(form.SelectedEmployeeId.Value);
+            history = await LoadHistoryAsync(form.SelectedEmployeeId.Value, plan);
         }
 
         ApplyTempAlert(ref alertMessage, ref alertType);
@@ -232,10 +234,25 @@ public sealed class PayrollController : Controller
             return RedirectToAction("Index", new { year, month });
         }
 
-        var records = await _db.PayrollRecords
+        var organization = await _db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == hr.OrganizationId);
+        if (organization is null)
+        {
+            return NotFound();
+        }
+
+        var retentionCutoff = RetentionPolicy.GetCutoff(organization.Plan, DateTimeOffset.UtcNow);
+
+        var recordsQuery = _db.PayrollRecords
             .AsNoTracking()
             .Include(r => r.User)
-            .Where(r => r.Year == year && r.Month == month && r.User != null && r.User.OrganizationId == hr.OrganizationId)
+            .Where(r => r.Year == year && r.Month == month && r.User != null && r.User.OrganizationId == hr.OrganizationId);
+
+        if (retentionCutoff is DateTimeOffset cutoff)
+        {
+            recordsQuery = recordsQuery.Where(r => r.CalculatedAt >= cutoff);
+        }
+
+        var records = await recordsQuery
             .OrderBy(r => r.User!.Name)
             .ToListAsync();
 
@@ -244,12 +261,6 @@ public sealed class PayrollController : Controller
             var label = new DateTime(year, month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
             SetTempAlert($"No payroll records found for {label}.", "warning");
             return RedirectToAction("Index", new { year, month });
-        }
-
-        var organization = await _db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == hr.OrganizationId);
-        if (organization is null)
-        {
-            return NotFound();
         }
 
         var entries = records
@@ -334,11 +345,21 @@ public sealed class PayrollController : Controller
             return new PayslipGenerationResult(null, "Organization not found.", "danger");
         }
 
+        var now = DateTimeOffset.UtcNow;
+        var retentionCutoff = RetentionPolicy.GetCutoff(organization.Plan, now);
+
         var periodLabel = new DateTime(form.Year, form.Month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
 
-        var record = await _db.PayrollRecords
+        var recordQuery = _db.PayrollRecords
             .AsNoTracking()
-            .FirstOrDefaultAsync(r => r.UserId == employee.Id && r.Year == form.Year && r.Month == form.Month);
+            .Where(r => r.UserId == employee.Id && r.Year == form.Year && r.Month == form.Month);
+
+        if (retentionCutoff is DateTimeOffset cutoff)
+        {
+            recordQuery = recordQuery.Where(r => r.CalculatedAt >= cutoff);
+        }
+
+        var record = await recordQuery.FirstOrDefaultAsync();
 
         if (record is not null)
         {
@@ -385,7 +406,7 @@ public sealed class PayrollController : Controller
             calculation.EmployeeName,
             employee.Email,
             calculation.PeriodLabel,
-            DateTimeOffset.UtcNow,
+            now,
             calculation.MonthlySalary,
             calculation.WorkingDays,
             calculation.PresentDays,
@@ -429,6 +450,15 @@ public sealed class PayrollController : Controller
         var idStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!int.TryParse(idStr, out var id)) return null;
         return await _db.Users.FindAsync(id);
+    }
+
+    private async Task<OrganizationPlan> GetOrganizationPlanAsync(int organizationId)
+    {
+        return await _db.Organizations
+            .AsNoTracking()
+            .Where(o => o.Id == organizationId)
+            .Select(o => o.Plan)
+            .FirstOrDefaultAsync();
     }
 
     private async Task<List<PayrollEmployeeOption>> LoadEmployeesAsync(int organizationId)
@@ -585,11 +615,21 @@ public sealed class PayrollController : Controller
         await _db.SaveChangesAsync();
     }
 
-    private async Task<List<PastPayrollRecordViewModel>> LoadHistoryAsync(int employeeId)
+    private async Task<List<PastPayrollRecordViewModel>> LoadHistoryAsync(int employeeId, OrganizationPlan plan)
     {
-        return await _db.PayrollRecords
+        var now = DateTimeOffset.UtcNow;
+        var retentionCutoff = RetentionPolicy.GetCutoff(plan, now);
+
+        var query = _db.PayrollRecords
             .AsNoTracking()
-            .Where(r => r.UserId == employeeId)
+            .Where(r => r.UserId == employeeId);
+
+        if (retentionCutoff is DateTimeOffset cutoff)
+        {
+            query = query.Where(r => r.CalculatedAt >= cutoff);
+        }
+
+        return await query
             .OrderByDescending(r => r.Year)
             .ThenByDescending(r => r.Month)
             .Take(12)

@@ -14,4 +14,6 @@ public sealed class Organization
     public string CreatedByEmail { get; set; } = string.Empty;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public OrganizationPlan Plan { get; set; } = OrganizationPlan.Free;
 }
