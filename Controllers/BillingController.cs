@@ -399,7 +399,7 @@ public sealed class BillingController : Controller
             throw new ArgumentException("URL cannot be null or whitespace.", nameof(url));
         }
 
-        return url.EndsWith('/', StringComparison.Ordinal)
+        return url.EndsWith("/", StringComparison.Ordinal)
             ? url
             : url + "/";
     }
