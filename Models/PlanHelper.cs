@@ -2,8 +2,8 @@ namespace TrackHive.Models;
 
 public static class PlanHelper
 {
-    public const OrganizationPlan PayrollRequiredPlan = OrganizationPlan.Growth;
-    public const OrganizationPlan AnalyticsRequiredPlan = OrganizationPlan.Growth;
+    public const OrganizationPlan PayrollRequiredPlan = OrganizationPlan.Pro;
+    public const OrganizationPlan AnalyticsRequiredPlan = OrganizationPlan.Pro;
     public const OrganizationPlan PdfRequiredPlan = OrganizationPlan.Starter;
 
     public static bool CanAccessPayroll(OrganizationPlan plan) => plan >= PayrollRequiredPlan;
@@ -18,8 +18,8 @@ public static class PlanHelper
     {
         OrganizationPlan.Free => "Free",
         OrganizationPlan.Starter => "Starter",
-        OrganizationPlan.Growth => "Growth",
-        OrganizationPlan.Scale => "Scale",
+        OrganizationPlan.Pro => "Pro",
+        OrganizationPlan.Enterprise => "Enterprise",
         _ => plan.ToString()
     };
 }

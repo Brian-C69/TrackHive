@@ -31,10 +31,7 @@ public sealed class PayrollController : Controller
         if (hr is null) return RedirectToAction("Login", "Auth");
         if (hr.MustChangePassword) return RedirectToAction("ChangePassword", "Auth");
 
-
         var employees = await LoadEmployeesAsync(hr.OrganizationId);
-        var plan = await GetOrganizationPlanAsync(hr.OrganizationId);
-
         var plan = await GetOrganizationPlanAsync(hr.OrganizationId);
         var canUsePayroll = PlanHelper.CanAccessPayroll(plan);
         var canExportPdf = PlanHelper.CanExportPdf(plan);
@@ -53,6 +50,7 @@ public sealed class PayrollController : Controller
         {
             var restrictedModel = new PayrollIndexViewModel
             {
+                Employees = employees,
                 Plan = plan,
                 CanUsePayroll = false,
                 CanExportPdf = canExportPdf,
@@ -61,8 +59,6 @@ public sealed class PayrollController : Controller
 
             return View(restrictedModel);
         }
-
-        var employees = await LoadEmployeesAsync(hr.OrganizationId);
 
         PayrollCalculationResult? result = null;
         IReadOnlyList<PastPayrollRecordViewModel> history = Array.Empty<PastPayrollRecordViewModel>();
@@ -112,10 +108,13 @@ public sealed class PayrollController : Controller
         var canUsePayroll = PlanHelper.CanAccessPayroll(plan);
         var canExportPdf = PlanHelper.CanExportPdf(plan);
 
+        var employees = await LoadEmployeesAsync(hr.OrganizationId);
+
         if (!canUsePayroll)
         {
             var restrictedModel = new PayrollIndexViewModel
             {
+                Employees = employees,
                 Plan = plan,
                 CanUsePayroll = false,
                 CanExportPdf = canExportPdf,
@@ -124,9 +123,6 @@ public sealed class PayrollController : Controller
 
             return View("Index", restrictedModel);
         }
-
-        var employees = await LoadEmployeesAsync(hr.OrganizationId);
-        var plan = await GetOrganizationPlanAsync(hr.OrganizationId);
         PayrollCalculationResult? result = null;
         IReadOnlyList<PastPayrollRecordViewModel> history = Array.Empty<PastPayrollRecordViewModel>();
         string? alertMessage = null;
@@ -549,15 +545,6 @@ public sealed class PayrollController : Controller
         var idStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!int.TryParse(idStr, out var id)) return null;
         return await _db.Users.FindAsync(id);
-    }
-
-    private async Task<OrganizationPlan> GetOrganizationPlanAsync(int organizationId)
-    {
-        return await _db.Organizations
-            .AsNoTracking()
-            .Where(o => o.Id == organizationId)
-            .Select(o => o.Plan)
-            .FirstOrDefaultAsync();
     }
 
     private async Task<List<PayrollEmployeeOption>> LoadEmployeesAsync(int organizationId)

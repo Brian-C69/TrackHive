@@ -447,20 +447,17 @@ public sealed class HrDashboardController : Controller
     private async Task<HrDashboardViewModel> BuildDashboardViewModelAsync(AppUser hr, InviteEmployeeViewModel? inviteOverride)
     {
         var org = await _db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == hr.OrganizationId);
-        var plan = org?.Plan ?? OrganizationPlan.Free;
-        var now = DateTimeOffset.UtcNow;
-        var retentionCutoff = RetentionPolicy.GetCutoff(plan, now);
-        var retentionDateCutoff = RetentionPolicy.GetDateCutoff(plan, now);
-        var invite = inviteOverride ?? new InviteEmployeeViewModel();
-
-        var plan = org?.CurrentPlan ?? SubscriptionPlan.Free;
+        var organizationPlan = org?.Plan ?? OrganizationPlan.Free;
+        var subscriptionPlan = org?.SubscriptionPlan ?? SubscriptionPlan.Free;
         var billingStart = org?.BillingPeriodStartUtc ?? hr.CreatedAt;
         var currentPeriodEnds = org?.CurrentPeriodEndsUtc;
         var trialEnds = org?.TrialEndsUtc;
 
-        var plan = org?.Plan ?? OrganizationPlan.Free;
-        var canViewAnalytics = PlanHelper.CanViewAnalytics(plan);
-
+        var now = DateTimeOffset.UtcNow;
+        var retentionCutoff = RetentionPolicy.GetCutoff(organizationPlan, now);
+        var retentionDateCutoff = RetentionPolicy.GetDateCutoff(organizationPlan, now);
+        var invite = inviteOverride ?? new InviteEmployeeViewModel();
+        var canViewAnalytics = PlanHelper.CanViewAnalytics(organizationPlan);
 
         var employees = await _db.Users
             .AsNoTracking()
@@ -481,9 +478,9 @@ public sealed class HrDashboardController : Controller
             .Include(r => r.User)
             .Where(r => employeeIds.Contains(r.UserId) && r.Status == LeaveRequestStatus.Pending);
 
-        if (retentionCutoff is DateTimeOffset retention)
+        if (retentionCutoff is DateTimeOffset pendingCutoff)
         {
-            pendingRequestQuery = pendingRequestQuery.Where(r => r.CreatedAt >= retention);
+            pendingRequestQuery = pendingRequestQuery.Where(r => r.CreatedAt >= pendingCutoff);
         }
 
         var pendingRequests = await pendingRequestQuery
@@ -695,6 +692,9 @@ public sealed class HrDashboardController : Controller
             {
                 attendanceWindowStart = retentionAttendance;
             }
+
+            static bool IsLate(DateTimeOffset checkInLocal, TimeSpan threshold) => checkInLocal.TimeOfDay > threshold;
+
             var recentAttendance = await _db.AttendanceRecords
                 .AsNoTracking()
                 .Where(a => employeeIds.Contains(a.UserId)
@@ -702,8 +702,6 @@ public sealed class HrDashboardController : Controller
                     && a.CheckInTime != null)
                 .Select(a => new { a.UserId, a.Date, a.CheckInTime })
                 .ToListAsync();
-
-            static bool IsLate(DateTimeOffset checkInLocal, TimeSpan threshold) => checkInLocal.TimeOfDay > threshold;
 
             var lateArrivals = recentAttendance
                 .Select(a => new
@@ -736,16 +734,17 @@ public sealed class HrDashboardController : Controller
             }
 
             var today = DateOnly.FromDateTime(now.UtcDateTime);
-            var monthStart = new DateOnly(today.Year, today.Month, 1);
-            if (retentionDateCutoff is DateOnly retentionMonthStart && retentionMonthStart > monthStart)
+            var monthStartDate = new DateOnly(today.Year, today.Month, 1);
+            if (retentionDateCutoff is DateOnly retentionMonthStart && retentionMonthStart > monthStartDate)
             {
-                monthStart = retentionMonthStart;
+                monthStartDate = retentionMonthStart;
             }
-            var nextMonth = monthStart.AddMonths(1);
+
+            var nextMonth = monthStartDate.AddMonths(1);
             var monthAttendance = await _db.AttendanceRecords
                 .AsNoTracking()
                 .Where(a => employeeIds.Contains(a.UserId)
-                    && a.Date >= monthStart
+                    && a.Date >= monthStartDate
                     && a.Date < nextMonth)
                 .Select(a => new { a.UserId, a.Date, a.CheckInTime })
                 .ToListAsync();
@@ -762,7 +761,7 @@ public sealed class HrDashboardController : Controller
                 notifications.Add(new DashboardNotificationViewModel
                 {
                     Category = "Reports",
-                    Title = $"{monthStart:MMMM yyyy} attendance summary",
+                    Title = $"{monthStartDate:MMMM yyyy} attendance summary",
                     Message = $"{totalCheckIns} check-in(s) recorded across {employeesActive} employee(s) with {lateCount} late arrival(s).",
                     CreatedAt = now
                 });
@@ -773,7 +772,6 @@ public sealed class HrDashboardController : Controller
             .OrderByDescending(n => n.CreatedAt ?? DateTimeOffset.MinValue)
             .Take(10)
             .ToList();
-
 
         var currentMonthUtc = new DateTime(now.UtcDateTime.Year, now.UtcDateTime.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var monthCandidates = Enumerable.Range(0, 6)
@@ -808,20 +806,25 @@ public sealed class HrDashboardController : Controller
             })
             .ToList();
 
-        var monthlyTrends = new List<MonthlyLeaveTrendViewModel>();
+        var monthlyTrends = monthRange
+            .Select(info => new MonthlyLeaveTrendViewModel
+            {
+                MonthLabel = info.Label,
+                Pending = 0,
+                Approved = 0,
+                Rejected = 0
+            })
+            .ToList();
+
         var leaveTypeBreakdown = new List<LeaveTypeBreakdownViewModel>();
-
         var leavesReviewedThisMonth = 0;
-        IReadOnlyList<MonthlyLeaveTrendViewModel> monthlyTrends = Array.Empty<MonthlyLeaveTrendViewModel>();
-        IReadOnlyList<LeaveTypeBreakdownViewModel> leaveTypeBreakdown = Array.Empty<LeaveTypeBreakdownViewModel>();
 
-        if (canViewAnalytics)
+        if (canViewAnalytics && employeeIds.Count > 0)
         {
-
             var earliestMonth = monthRange.First().Date;
             var leaveHistoryQuery = _db.LeaveRequests
                 .AsNoTracking()
-                .Where(r => employeeIds.Contains(r.UserId));
+                .Where(r => employeeIds.Contains(r.UserId) && r.CreatedAt >= earliestMonth);
 
             if (retentionCutoff is DateTimeOffset historyCutoff)
             {
@@ -829,104 +832,40 @@ public sealed class HrDashboardController : Controller
             }
 
             var leaveHistory = await leaveHistoryQuery
-                .Where(r => r.CreatedAt >= earliestMonth)
                 .Select(r => new { r.CreatedAt, r.Status })
                 .ToListAsync();
 
-            var currentMonthUtc = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-            var monthRange = Enumerable.Range(0, 6)
-                .Select(offset => currentMonthUtc.AddMonths(offset - 5))
-                .Select(date => new
-                {
-                    Date = date,
-                    Label = date.ToString("MMM yyyy", CultureInfo.InvariantCulture)
-                })
-                .ToList();
+            var monthlyLookup = leaveHistory
+                .GroupBy(r => new DateTime(r.CreatedAt.Year, r.CreatedAt.Month, 1, 0, 0, 0, DateTimeKind.Utc))
+                .ToDictionary(
+                    g => g.Key,
+                    g =>
+                    {
+                        var pending = g.Count(x => x.Status == LeaveRequestStatus.Pending || x.Status == LeaveRequestStatus.AwaitingCertificateReview);
+                        var approved = g.Count(x => x.Status == LeaveRequestStatus.Approved || x.Status == LeaveRequestStatus.ApprovedAwaitingCertificate);
+                        var rejected = g.Count(x => x.Status == LeaveRequestStatus.Rejected || x.Status == LeaveRequestStatus.CertificateRejected);
+                        return (Pending: pending, Approved: approved, Rejected: rejected);
+                    });
 
-
-            var trendList = new List<MonthlyLeaveTrendViewModel>();
-            var breakdownList = new List<LeaveTypeBreakdownViewModel>();
-
-            if (employeeIds.Count > 0)
+            for (var i = 0; i < monthRange.Count; i++)
             {
-                var earliestMonth = monthRange.First().Date;
-                var leaveHistory = await _db.LeaveRequests
-                    .AsNoTracking()
-                    .Where(r => employeeIds.Contains(r.UserId) && r.CreatedAt >= earliestMonth)
-                    .Select(r => new { r.CreatedAt, r.Status })
-                    .ToListAsync();
-
-                var monthlyLookup = leaveHistory
-                    .GroupBy(r => new DateTime(r.CreatedAt.Year, r.CreatedAt.Month, 1, 0, 0, 0, DateTimeKind.Utc))
-                    .ToDictionary(
-                        g => g.Key,
-                        g =>
-                        {
-                            var pending = g.Count(x => x.Status == LeaveRequestStatus.Pending || x.Status == LeaveRequestStatus.AwaitingCertificateReview);
-                            var approved = g.Count(x => x.Status == LeaveRequestStatus.Approved || x.Status == LeaveRequestStatus.ApprovedAwaitingCertificate);
-                            var rejected = g.Count(x => x.Status == LeaveRequestStatus.Rejected || x.Status == LeaveRequestStatus.CertificateRejected);
-                            return (Pending: pending, Approved: approved, Rejected: rejected);
-                        });
-
-                foreach (var info in monthRange)
+                var info = monthRange[i];
+                if (monthlyLookup.TryGetValue(info.Date, out var counts))
                 {
-                    if (monthlyLookup.TryGetValue(info.Date, out var counts))
-                    {
-                        trendList.Add(new MonthlyLeaveTrendViewModel
-                        {
-                            MonthLabel = info.Label,
-                            Pending = counts.Pending,
-                            Approved = counts.Approved,
-                            Rejected = counts.Rejected
-                        });
-
-                        if (info.Date == currentMonthUtc)
-                        {
-                            leavesReviewedThisMonth = counts.Approved + counts.Rejected;
-                        }
-                    }
-                    else
-                    {
-                        trendList.Add(new MonthlyLeaveTrendViewModel
-                        {
-                            MonthLabel = info.Label,
-                            Pending = 0,
-                            Approved = 0,
-                            Rejected = 0
-                        });
-                    }
-                }
-
-                var typeCounts = await _db.LeaveRequests
-                    .AsNoTracking()
-                    .Where(r => employeeIds.Contains(r.UserId))
-                    .GroupBy(r => r.Type)
-                    .Select(g => new { Type = g.Key, Count = g.Count() })
-                    .ToListAsync();
-
-                breakdownList = typeCounts
-                    .OrderByDescending(t => t.Count)
-                    .Select(t => new LeaveTypeBreakdownViewModel
-                    {
-                        Type = FormatLeaveType(t.Type),
-                        Count = t.Count
-                    })
-                    .ToList();
-            }
-
-            if (trendList.Count == 0)
-            {
-                trendList = monthRange
-                    .Select(info => new MonthlyLeaveTrendViewModel
+                    monthlyTrends[i] = new MonthlyLeaveTrendViewModel
                     {
                         MonthLabel = info.Label,
-                        Pending = 0,
-                        Approved = 0,
-                        Rejected = 0
-                    })
-                    .ToList();
-            }
+                        Pending = counts.Pending,
+                        Approved = counts.Approved,
+                        Rejected = counts.Rejected
+                    };
 
+                    if (info.Date == currentMonthUtc)
+                    {
+                        leavesReviewedThisMonth = counts.Approved + counts.Rejected;
+                    }
+                }
+            }
 
             var leaveTypeQuery = _db.LeaveRequests
                 .AsNoTracking()
@@ -952,23 +891,6 @@ public sealed class HrDashboardController : Controller
                 .ToList();
         }
 
-        if (monthlyTrends.Count == 0)
-        {
-            monthlyTrends = monthRange
-                .Select(info => new MonthlyLeaveTrendViewModel
-                {
-                    MonthLabel = info.Label,
-                    Pending = 0,
-                    Approved = 0,
-                    Rejected = 0
-                })
-                .ToList();
-
-            monthlyTrends = trendList;
-            leaveTypeBreakdown = breakdownList;
-
-        }
-
         var metrics = new DashboardMetricsViewModel
         {
             TotalEmployees = employees.Count,
@@ -983,7 +905,7 @@ public sealed class HrDashboardController : Controller
         return new HrDashboardViewModel
         {
             OrganizationName = org?.Name ?? "Organization",
-            CurrentPlan = plan,
+            CurrentPlan = subscriptionPlan,
             BillingPeriodStartUtc = billingStart,
             CurrentPeriodEndsUtc = currentPeriodEnds,
             TrialEndsUtc = trialEnds,
@@ -993,7 +915,7 @@ public sealed class HrDashboardController : Controller
             LeaveSummaries = leaveSummaries,
             Notifications = orderedNotifications,
             Metrics = metrics,
-            Plan = plan,
+            Plan = organizationPlan,
             CanViewAnalytics = canViewAnalytics
         };
     }

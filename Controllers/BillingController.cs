@@ -330,6 +330,7 @@ public sealed class BillingController : Controller
         }
 
         org.SubscriptionPlan = plan;
+        org.CurrentPlan = plan;
         if (!string.IsNullOrWhiteSpace(customerId))
         {
             org.StripeCustomerId = customerId;

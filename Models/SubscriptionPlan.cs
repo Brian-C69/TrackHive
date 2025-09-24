@@ -6,12 +6,7 @@ namespace TrackHive.Models;
 public enum SubscriptionPlan
 {
     Free = 0,
-
-    Growth = 1,
-    Enterprise = 2
-
     Starter = 1,
     Pro = 2,
     Enterprise = 3
-
 }

@@ -18,10 +18,14 @@ public sealed class SubscriptionUsageService
                 HrLimit: 1,
                 EmployeeLimit: 10,
                 UpgradeMessage: "Upgrade from Settings → Billing to unlock more seats."),
-            [SubscriptionPlan.Growth] = new SubscriptionPlanLimits(
-                HrLimit: 5,
-                EmployeeLimit: 100,
-                UpgradeMessage: "Upgrade to the Enterprise plan for unlimited seats."),
+            [SubscriptionPlan.Starter] = new SubscriptionPlanLimits(
+                HrLimit: 3,
+                EmployeeLimit: 25,
+                UpgradeMessage: "Upgrade to the Pro plan to invite more teammates."),
+            [SubscriptionPlan.Pro] = new SubscriptionPlanLimits(
+                HrLimit: null,
+                EmployeeLimit: null,
+                UpgradeMessage: "Upgrade to the Enterprise plan for dedicated onboarding."),
             [SubscriptionPlan.Enterprise] = new SubscriptionPlanLimits(
                 HrLimit: null,
                 EmployeeLimit: null,
@@ -97,13 +101,7 @@ public sealed class SubscriptionUsageService
         int current,
         string upgradeMessage)
     {
-        var planName = plan switch
-        {
-            SubscriptionPlan.Free => "Free",
-            SubscriptionPlan.Growth => "Growth",
-            SubscriptionPlan.Enterprise => "Enterprise",
-            _ => plan.ToString()
-        };
+        var planName = plan.GetDisplayName();
 
         return $"Invite blocked: the {planName} plan allows up to {limit} {seatLabel} (currently {current}/{limit}). {upgradeMessage}";
     }

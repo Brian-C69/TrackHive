@@ -3,14 +3,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace TrackHive.Models;
 
-public enum SubscriptionPlan
-{
-    Free,
-    Starter,
-    Pro,
-    Enterprise
-}
-
 public sealed class Organization
 {
     public int Id { get; set; }
@@ -21,15 +13,9 @@ public sealed class Organization
     [Required, EmailAddress]
     public string CreatedByEmail { get; set; } = string.Empty;
 
-    [Required]
-    public OrganizationPlan Plan { get; set; } = OrganizationPlan.Free;
-
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-
     public OrganizationPlan Plan { get; set; } = OrganizationPlan.Free;
-
-    [Required]
 
     public SubscriptionPlan CurrentPlan { get; set; } = SubscriptionPlan.Free;
 
@@ -40,7 +26,6 @@ public sealed class Organization
     public DateTime? TrialEndsUtc { get; set; }
 
     public SubscriptionPlan SubscriptionPlan { get; set; } = SubscriptionPlan.Free;
-
 
     [StringLength(200)]
     public string? StripeCustomerId { get; set; }
