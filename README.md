@@ -103,6 +103,16 @@ Set your connection string and SMTP in `appsettings.json` (or via user secrets /
 }
 ```
 
+When testing Stripe locally behind tunnels or custom ports, you can override the redirect host with `Stripe.CheckoutRedirectBaseUrl`:
+
+```json
+{
+  "Stripe": {
+    "CheckoutRedirectBaseUrl": "http://localhost:5078"
+  }
+}
+```
+
 ---
 
 ## 🚀 Quick Start
