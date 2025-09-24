@@ -13,10 +13,20 @@ namespace TrackHive.Services;
 
 public sealed class BillingService
 {
+    private const string BillingCurrency = "usd";
+    private const string BillingInterval = "month";
+
+    private static readonly IReadOnlyDictionary<SubscriptionPlan, long> PlanAmounts =
+        new Dictionary<SubscriptionPlan, long>
+        {
+            [SubscriptionPlan.Starter] = 99_00L,
+            [SubscriptionPlan.Pro] = 199_00L,
+            [SubscriptionPlan.Enterprise] = 399_00L
+        };
+
     private readonly StripeOptions _options;
     private readonly SessionService _sessionService;
     private readonly SubscriptionService _subscriptionService;
-    private readonly IReadOnlyDictionary<SubscriptionPlan, string> _configuredPrices;
 
     private readonly ILogger<BillingService> _logger;
 
@@ -33,8 +43,6 @@ public sealed class BillingService
         }
 
         StripeConfiguration.ApiKey = _options.SecretKey;
-        _configuredPrices = _options.Prices.AsDictionary();
-
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         _sessionService = new SessionService();
@@ -48,8 +56,6 @@ public sealed class BillingService
         string successUrl,
         string cancelUrl)
     {
-        var priceId = await ResolvePriceIdAsync(plan);
-
         var metadata = new Dictionary<string, string>
         {
             ["organizationId"] = organizationId.ToString(CultureInfo.InvariantCulture),
@@ -71,11 +77,7 @@ public sealed class BillingService
             },
             LineItems = new List<SessionLineItemOptions>
             {
-                new()
-                {
-                    Price = priceId,
-                    Quantity = 1
-                }
+                CreateSubscriptionLineItem(plan)
             }
         };
 
@@ -127,15 +129,31 @@ public sealed class BillingService
 
     public string GetPublishableKey() => _options.PublishableKey;
 
-    private Task<string> ResolvePriceIdAsync(SubscriptionPlan plan)
+    private SessionLineItemOptions CreateSubscriptionLineItem(SubscriptionPlan plan)
     {
-        if (!_configuredPrices.TryGetValue(plan, out var configuredValue) || string.IsNullOrWhiteSpace(configuredValue))
+        if (!PlanAmounts.TryGetValue(plan, out var amount))
         {
-            throw new InvalidOperationException($"Stripe price ID is not configured for plan '{plan}'.");
+            throw new InvalidOperationException($"No pricing configured for plan '{plan}'.");
         }
 
-        _logger.LogDebug("Using configured Stripe price ID {PriceId} for plan {Plan}.", configuredValue, plan);
+        var displayName = plan.GetDisplayName();
 
-        return Task.FromResult(configuredValue);
+        return new SessionLineItemOptions
+        {
+            Quantity = 1,
+            PriceData = new SessionLineItemPriceDataOptions
+            {
+                Currency = BillingCurrency,
+                UnitAmount = amount,
+                ProductData = new SessionLineItemPriceDataProductDataOptions
+                {
+                    Name = displayName
+                },
+                Recurring = new SessionLineItemPriceDataRecurringOptions
+                {
+                    Interval = BillingInterval
+                }
+            }
+        };
     }
 }
