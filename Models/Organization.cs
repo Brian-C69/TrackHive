@@ -15,8 +15,6 @@ public sealed class Organization
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    public OrganizationPlan Plan { get; set; } = OrganizationPlan.Free;
-
     public SubscriptionPlan CurrentPlan { get; set; } = SubscriptionPlan.Free;
 
     public DateTime BillingPeriodStartUtc { get; set; } = DateTime.UtcNow;

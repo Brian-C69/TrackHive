@@ -32,7 +32,7 @@ public sealed class PayrollController : Controller
         if (hr.MustChangePassword) return RedirectToAction("ChangePassword", "Auth");
 
         var employees = await LoadEmployeesAsync(hr.OrganizationId);
-        var plan = await GetOrganizationPlanAsync(hr.OrganizationId);
+        var plan = await GetSubscriptionPlanAsync(hr.OrganizationId);
         var canUsePayroll = PlanHelper.CanAccessPayroll(plan);
         var canExportPdf = PlanHelper.CanExportPdf(plan);
 
@@ -104,7 +104,7 @@ public sealed class PayrollController : Controller
 
         var form = postedModel.Form ?? new PayrollCalculationForm();
         postedModel.Form = form;
-        var plan = await GetOrganizationPlanAsync(hr.OrganizationId);
+        var plan = await GetSubscriptionPlanAsync(hr.OrganizationId);
         var canUsePayroll = PlanHelper.CanAccessPayroll(plan);
         var canExportPdf = PlanHelper.CanExportPdf(plan);
 
@@ -212,7 +212,7 @@ public sealed class PayrollController : Controller
         if (hr is null) return RedirectToAction("Login", "Auth");
         if (hr.MustChangePassword) return RedirectToAction("ChangePassword", "Auth");
 
-        var plan = await GetOrganizationPlanAsync(hr.OrganizationId);
+        var plan = await GetSubscriptionPlanAsync(hr.OrganizationId);
         var canUsePayroll = PlanHelper.CanAccessPayroll(plan);
         var canExportPdf = PlanHelper.CanExportPdf(plan);
         var routeValues = new { employeeId, year, month };
@@ -260,7 +260,7 @@ public sealed class PayrollController : Controller
         if (hr is null) return RedirectToAction("Login", "Auth");
         if (hr.MustChangePassword) return RedirectToAction("ChangePassword", "Auth");
 
-        var plan = await GetOrganizationPlanAsync(hr.OrganizationId);
+        var plan = await GetSubscriptionPlanAsync(hr.OrganizationId);
         var canUsePayroll = PlanHelper.CanAccessPayroll(plan);
         var canExportPdf = PlanHelper.CanExportPdf(plan);
         var routeValues = new { employeeId = form.SelectedEmployeeId, year = form.Year, month = form.Month };
@@ -298,7 +298,7 @@ public sealed class PayrollController : Controller
         if (hr is null) return RedirectToAction("Login", "Auth");
         if (hr.MustChangePassword) return RedirectToAction("ChangePassword", "Auth");
 
-        var plan = await GetOrganizationPlanAsync(hr.OrganizationId);
+        var plan = await GetSubscriptionPlanAsync(hr.OrganizationId);
         var canUsePayroll = PlanHelper.CanAccessPayroll(plan);
         var canExportPdf = PlanHelper.CanExportPdf(plan);
 
@@ -326,7 +326,7 @@ public sealed class PayrollController : Controller
             return NotFound();
         }
 
-        var retentionCutoff = RetentionPolicy.GetCutoff(organization.Plan, DateTimeOffset.UtcNow);
+        var retentionCutoff = RetentionPolicy.GetCutoff(organization.CurrentPlan, DateTimeOffset.UtcNow);
 
         var recordsQuery = _db.PayrollRecords
             .AsNoTracking()
@@ -432,7 +432,7 @@ public sealed class PayrollController : Controller
         }
 
         var now = DateTimeOffset.UtcNow;
-        var retentionCutoff = RetentionPolicy.GetCutoff(organization.Plan, now);
+        var retentionCutoff = RetentionPolicy.GetCutoff(organization.CurrentPlan, now);
 
         var periodLabel = new DateTime(form.Year, form.Month, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
 
@@ -531,12 +531,12 @@ public sealed class PayrollController : Controller
 
     private sealed record PayslipGenerationResult(PayslipDocumentModel? Document, string? ErrorMessage, string AlertType);
 
-    private async Task<OrganizationPlan> GetOrganizationPlanAsync(int organizationId)
+    private async Task<SubscriptionPlan> GetSubscriptionPlanAsync(int organizationId)
     {
         return await _db.Organizations
             .AsNoTracking()
             .Where(o => o.Id == organizationId)
-            .Select(o => o.Plan)
+            .Select(o => o.CurrentPlan)
             .FirstOrDefaultAsync();
     }
 
@@ -701,7 +701,7 @@ public sealed class PayrollController : Controller
         await _db.SaveChangesAsync();
     }
 
-    private async Task<List<PastPayrollRecordViewModel>> LoadHistoryAsync(int employeeId, OrganizationPlan plan)
+    private async Task<List<PastPayrollRecordViewModel>> LoadHistoryAsync(int employeeId, SubscriptionPlan plan)
     {
         var now = DateTimeOffset.UtcNow;
         var retentionCutoff = RetentionPolicy.GetCutoff(plan, now);

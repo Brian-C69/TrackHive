@@ -284,22 +284,10 @@ namespace TrackHive.Models
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
 
-                    b.Property<int>("Plan")
-                        .HasColumnType("int")
-                        .HasDefaultValue(0);
-
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
-
-
-                    b.Property<int>("Plan")
-                        .HasColumnType("int");
-
-
-
                     b.Property<DateTime?>("TrialEndsUtc")
                         .HasColumnType("datetime2");
 
@@ -319,9 +307,6 @@ namespace TrackHive.Models
 
                     b.Property<DateTime?>("SubscriptionRenewsAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("SubscriptionPlan")
-                        .HasColumnType("int");
 
                     b.Property<DateTime?>("SubscriptionUpdatedAt")
                         .HasColumnType("datetime2");
