@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TrackHive.Models;
 
@@ -11,9 +12,10 @@ using TrackHive.Models;
 namespace TrackHive.Models
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251215093000_BillingSubscriptions")]
+    partial class BillingSubscriptions : Migration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -265,9 +267,6 @@ namespace TrackHive.Models
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime>("BillingPeriodStartUtc")
-                        .HasColumnType("datetime2");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -275,34 +274,10 @@ namespace TrackHive.Models
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-
-                    b.Property<DateTime?>("CurrentPeriodEndsUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CurrentPlan")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<int>("Plan")
-                        .HasColumnType("int")
-                        .HasDefaultValue(0);
-
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
-
-
-                    b.Property<DateTime?>("TrialEndsUtc")
-                        .HasColumnType("datetime2");
-
-
-
-                    b.Property<int>("SubscriptionPlan")
-                        .HasColumnType("int");
-
 
                     b.Property<string>("StripeCustomerId")
                         .HasMaxLength(200)
@@ -320,8 +295,6 @@ namespace TrackHive.Models
 
                     b.Property<DateTime?>("SubscriptionUpdatedAt")
                         .HasColumnType("datetime2");
-
-
 
                     b.HasKey("Id");
 

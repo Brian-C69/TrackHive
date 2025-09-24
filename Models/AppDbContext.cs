@@ -18,6 +18,7 @@ public sealed class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+
         modelBuilder.Entity<Organization>()
             .Property(o => o.CurrentPlan)
             .HasConversion<string>()
@@ -34,6 +35,18 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<Organization>()
             .Property(o => o.TrialEndsUtc)
             .HasColumnType("datetime2");
+
+
+        modelBuilder.Entity<Organization>()
+            .HasIndex(o => o.StripeSubscriptionId)
+            .IsUnique()
+            .HasFilter("[StripeSubscriptionId] IS NOT NULL");
+
+
+        modelBuilder.Entity<Organization>()
+            .Property(o => o.Plan)
+            .HasDefaultValue(OrganizationPlan.Free);
+
 
         modelBuilder.Entity<AppUser>()
             .Property(u => u.BirthDate)

@@ -38,6 +38,12 @@ builder.Services.AddTransient<EmailService>();
 builder.Services.AddScoped<MustChangePasswordFilter>();
 builder.Services.AddSingleton<PayrollPdfGenerator>();
 
+builder.Services.AddScoped<SubscriptionUsageService>();
+
+builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection("Stripe"));
+builder.Services.AddSingleton<BillingService>();
+
+
 var app = builder.Build();
 
 // Apply migrations
