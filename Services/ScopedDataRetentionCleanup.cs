@@ -15,15 +15,15 @@ public sealed class ScopedDataRetentionCleanup
     public async Task<int> ApplyAsync(DateTimeOffset currentTime, CancellationToken cancellationToken = default)
     {
         var deleted = 0;
-        var instantCutoff = RetentionPolicy.GetCutoff(OrganizationPlan.Free, currentTime);
-        var dateCutoff = RetentionPolicy.GetDateCutoff(OrganizationPlan.Free, currentTime);
+        var instantCutoff = RetentionPolicy.GetCutoff(SubscriptionPlan.Free, currentTime);
+        var dateCutoff = RetentionPolicy.GetDateCutoff(SubscriptionPlan.Free, currentTime);
 
         if (dateCutoff is DateOnly dateOnlyCutoff)
         {
             deleted += await _db.AttendanceRecords
                 .Where(r => r.User != null
                     && r.User.Organization != null
-                    && r.User.Organization.Plan == OrganizationPlan.Free
+                    && r.User.Organization.CurrentPlan == SubscriptionPlan.Free
                     && r.Date < dateOnlyCutoff)
                 .ExecuteDeleteAsync(cancellationToken);
         }
@@ -34,21 +34,21 @@ public sealed class ScopedDataRetentionCleanup
                 .Where(d => d.LeaveRequest != null
                     && d.LeaveRequest.User != null
                     && d.LeaveRequest.User.Organization != null
-                    && d.LeaveRequest.User.Organization.Plan == OrganizationPlan.Free
+                    && d.LeaveRequest.User.Organization.CurrentPlan == SubscriptionPlan.Free
                     && d.UploadedAt < cutoff)
                 .ExecuteDeleteAsync(cancellationToken);
 
             deleted += await _db.LeaveRequests
                 .Where(r => r.User != null
                     && r.User.Organization != null
-                    && r.User.Organization.Plan == OrganizationPlan.Free
+                    && r.User.Organization.CurrentPlan == SubscriptionPlan.Free
                     && r.CreatedAt < cutoff)
                 .ExecuteDeleteAsync(cancellationToken);
 
             deleted += await _db.PayrollRecords
                 .Where(r => r.User != null
                     && r.User.Organization != null
-                    && r.User.Organization.Plan == OrganizationPlan.Free
+                    && r.User.Organization.CurrentPlan == SubscriptionPlan.Free
                     && r.CalculatedAt < cutoff)
                 .ExecuteDeleteAsync(cancellationToken);
         }

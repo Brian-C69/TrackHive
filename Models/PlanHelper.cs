@@ -2,24 +2,24 @@ namespace TrackHive.Models;
 
 public static class PlanHelper
 {
-    public const OrganizationPlan PayrollRequiredPlan = OrganizationPlan.Pro;
-    public const OrganizationPlan AnalyticsRequiredPlan = OrganizationPlan.Pro;
-    public const OrganizationPlan PdfRequiredPlan = OrganizationPlan.Starter;
+    public const SubscriptionPlan PayrollRequiredPlan = SubscriptionPlan.Pro;
+    public const SubscriptionPlan AnalyticsRequiredPlan = SubscriptionPlan.Pro;
+    public const SubscriptionPlan PdfRequiredPlan = SubscriptionPlan.Starter;
 
-    public static bool CanAccessPayroll(OrganizationPlan plan) => plan >= PayrollRequiredPlan;
+    public static bool CanAccessPayroll(SubscriptionPlan plan) => plan >= PayrollRequiredPlan;
 
-    public static bool CanViewAnalytics(OrganizationPlan plan) => plan >= AnalyticsRequiredPlan;
+    public static bool CanViewAnalytics(SubscriptionPlan plan) => plan >= AnalyticsRequiredPlan;
 
-    public static bool CanExportPdf(OrganizationPlan plan) => plan >= PdfRequiredPlan;
+    public static bool CanExportPdf(SubscriptionPlan plan) => plan >= PdfRequiredPlan;
 
-    public static bool RequiresUpgrade(OrganizationPlan plan, OrganizationPlan required) => plan < required;
+    public static bool RequiresUpgrade(SubscriptionPlan plan, SubscriptionPlan required) => plan < required;
 
-    public static string GetDisplayName(OrganizationPlan plan) => plan switch
+    public static string GetDisplayName(SubscriptionPlan plan) => plan switch
     {
-        OrganizationPlan.Free => "Free",
-        OrganizationPlan.Starter => "Starter",
-        OrganizationPlan.Pro => "Pro",
-        OrganizationPlan.Enterprise => "Enterprise",
+        SubscriptionPlan.Free => "Free",
+        SubscriptionPlan.Starter => "Starter",
+        SubscriptionPlan.Pro => "Pro",
+        SubscriptionPlan.Enterprise => "Enterprise",
         _ => plan.ToString()
     };
 }

@@ -6,14 +6,14 @@ public static class RetentionPolicy
 {
     public const int FreePlanRetentionDays = 90;
 
-    public static DateTimeOffset? GetCutoff(OrganizationPlan plan, DateTimeOffset currentTime)
+    public static DateTimeOffset? GetCutoff(SubscriptionPlan plan, DateTimeOffset currentTime)
     {
-        return plan == OrganizationPlan.Free
+        return plan == SubscriptionPlan.Free
             ? currentTime.AddDays(-FreePlanRetentionDays)
             : null;
     }
 
-    public static DateOnly? GetDateCutoff(OrganizationPlan plan, DateTimeOffset currentTime)
+    public static DateOnly? GetDateCutoff(SubscriptionPlan plan, DateTimeOffset currentTime)
     {
         var cutoff = GetCutoff(plan, currentTime);
         return cutoff.HasValue

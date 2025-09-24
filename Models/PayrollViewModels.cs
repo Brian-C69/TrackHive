@@ -88,7 +88,7 @@ public sealed class PayrollIndexViewModel
     public string AlertType { get; init; } = "info";
 
     public bool HasEmployees => Employees.Count > 0;
-    public OrganizationPlan Plan { get; init; } = OrganizationPlan.Free;
+    public SubscriptionPlan Plan { get; init; } = SubscriptionPlan.Free;
     public bool CanUsePayroll { get; init; } = true;
     public bool CanExportPdf { get; init; } = true;
 }
