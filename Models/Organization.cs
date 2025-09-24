@@ -13,5 +13,8 @@ public sealed class Organization
     [Required, EmailAddress]
     public string CreatedByEmail { get; set; } = string.Empty;
 
+    [Required]
+    public OrganizationPlan Plan { get; set; } = OrganizationPlan.Free;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

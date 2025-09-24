@@ -250,6 +250,7 @@ public sealed class AuthController : Controller
         {
             Name = orgName,
             CreatedByEmail = model.Email.Trim(),
+            Plan = OrganizationPlan.Free,
             CreatedAt = DateTime.UtcNow
         };
         _db.Organizations.Add(org);
