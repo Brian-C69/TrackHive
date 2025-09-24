@@ -8,7 +8,6 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -105,7 +104,7 @@ public sealed class BillingController : Controller
             {
                 throw new InvalidOperationException("Unable to resolve the success URL.");
             }
-            successUrl = QueryHelpers.AddQueryString(successUrl, "session_id", "{CHECKOUT_SESSION_ID}");
+            successUrl = AppendCheckoutSessionId(successUrl);
 
             var cancelUrl = Url.Action(nameof(Failed), "Billing", new { plan }, Request.Scheme, Request.Host.ToString());
             if (string.IsNullOrWhiteSpace(cancelUrl))
@@ -267,6 +266,22 @@ public sealed class BillingController : Controller
         Tagline = plan.GetTagline(),
         Highlights = plan.GetHighlights()
     };
+
+    internal static string AppendCheckoutSessionId(string baseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            throw new ArgumentException("Base URL cannot be null or whitespace.", nameof(baseUrl));
+        }
+
+        if (baseUrl.Contains("session_id={CHECKOUT_SESSION_ID}", StringComparison.Ordinal))
+        {
+            return baseUrl;
+        }
+
+        var separator = baseUrl.Contains('?', StringComparison.Ordinal) ? '&' : '?';
+        return $"{baseUrl}{separator}session_id={{CHECKOUT_SESSION_ID}}";
+    }
 
     private async Task HandleCheckoutSessionAsync(Session session)
     {
