@@ -17,4 +17,17 @@ public sealed class Organization
     public OrganizationPlan Plan { get; set; } = OrganizationPlan.Free;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [Required]
+    public SubscriptionPlan SubscriptionPlan { get; set; } = SubscriptionPlan.Free;
+
+    [StringLength(200)]
+    public string? StripeCustomerId { get; set; }
+
+    [StringLength(200)]
+    public string? StripeSubscriptionId { get; set; }
+
+    public DateTime? SubscriptionRenewsAt { get; set; }
+
+    public DateTime? SubscriptionUpdatedAt { get; set; }
 }

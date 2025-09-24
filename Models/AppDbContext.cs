@@ -20,6 +20,11 @@ public sealed class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
 
+        modelBuilder.Entity<Organization>()
+            .HasIndex(o => o.StripeSubscriptionId)
+            .IsUnique()
+            .HasFilter("[StripeSubscriptionId] IS NOT NULL");
+
 
         modelBuilder.Entity<Organization>()
             .Property(o => o.Plan)
