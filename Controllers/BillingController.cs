@@ -279,8 +279,13 @@ public sealed class BillingController : Controller
             return baseUrl;
         }
 
-        var separator = baseUrl.Contains('?', StringComparison.Ordinal) ? '&' : '?';
-        return $"{baseUrl}{separator}session_id={{CHECKOUT_SESSION_ID}}";
+        var fragmentIndex = baseUrl.IndexOf('#');
+        var hasFragment = fragmentIndex >= 0;
+        var fragment = hasFragment ? baseUrl.Substring(fragmentIndex) : string.Empty;
+        var withoutFragment = hasFragment ? baseUrl[..fragmentIndex] : baseUrl;
+
+        var separator = withoutFragment.Contains('?', StringComparison.Ordinal) ? '&' : '?';
+        return $"{withoutFragment}{separator}session_id={{CHECKOUT_SESSION_ID}}{fragment}";
     }
 
     private async Task HandleCheckoutSessionAsync(Session session)
