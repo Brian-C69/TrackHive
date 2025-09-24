@@ -26,6 +26,9 @@ public sealed class Organization
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+
+    public OrganizationPlan Plan { get; set; } = OrganizationPlan.Free;
+
     [Required]
 
     public SubscriptionPlan CurrentPlan { get; set; } = SubscriptionPlan.Free;
@@ -48,6 +51,4 @@ public sealed class Organization
     public DateTime? SubscriptionRenewsAt { get; set; }
 
     public DateTime? SubscriptionUpdatedAt { get; set; }
-
-
 }

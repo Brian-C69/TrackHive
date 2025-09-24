@@ -37,6 +37,9 @@ builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp")
 builder.Services.AddTransient<EmailService>();
 builder.Services.AddScoped<MustChangePasswordFilter>();
 builder.Services.AddSingleton<PayrollPdfGenerator>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<ScopedDataRetentionCleanup>();
+builder.Services.AddHostedService<DataRetentionService>();
 
 builder.Services.AddScoped<SubscriptionUsageService>();
 

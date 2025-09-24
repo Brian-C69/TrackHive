@@ -22,5 +22,12 @@
     <PackageReference Include="Stripe.net" Version="47.13.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="TrackHive.Tests/**/*.cs" />
+    <None Remove="TrackHive.Tests/**" />
+    <EmbeddedResource Remove="TrackHive.Tests/**" />
+    <Content Remove="TrackHive.Tests/**" />
+  </ItemGroup>
+
 
 </Project>
