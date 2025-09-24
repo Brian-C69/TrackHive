@@ -1,7 +1,9 @@
 // File: Services/StripePriceLookupService.cs
 using System.Collections.Generic;
 using System.Linq;
+
 using System.Net;
+
 using System.Threading.Tasks;
 using Stripe;
 
@@ -10,6 +12,7 @@ namespace TrackHive.Services;
 public interface IStripePriceLookupService
 {
     Task<bool> PriceExistsAsync(string priceId);
+
     Task<string?> GetPriceIdByLookupKeyAsync(string lookupKey);
 }
 
@@ -21,6 +24,7 @@ public sealed class StripePriceLookupService : IStripePriceLookupService
     {
         _priceService = new PriceService();
     }
+
 
     public async Task<bool> PriceExistsAsync(string priceId)
     {
@@ -57,6 +61,7 @@ public sealed class StripePriceLookupService : IStripePriceLookupService
         return prices.Data.FirstOrDefault()?.Id;
     }
 
+
     private static bool IsMissingResource(StripeException ex)
     {
         if (ex.HttpStatusCode == HttpStatusCode.NotFound)
@@ -66,4 +71,5 @@ public sealed class StripePriceLookupService : IStripePriceLookupService
 
         return string.Equals(ex.StripeError?.Code, "resource_missing", System.StringComparison.OrdinalIgnoreCase);
     }
+
 }

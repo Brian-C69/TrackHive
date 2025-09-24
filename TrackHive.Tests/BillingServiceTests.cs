@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
+
 using Microsoft.Extensions.Logging.Abstractions;
+
 using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using TrackHive.Models;
@@ -16,15 +18,18 @@ public class BillingServiceTests
     [TestMethod]
     public async Task ResolvePriceIdAsync_ReturnsConfiguredId_WhenValueAlreadyPriceId()
     {
+
         var fakeLookup = new FakePriceLookupService();
         fakeLookup.PriceExistence["price_123"] = true;
         var service = CreateService("price_123", fakeLookup);
+
 
         var priceId = await InvokeResolvePriceIdAsync(service, SubscriptionPlan.Starter);
 
         Assert.AreEqual("price_123", priceId);
         Assert.AreEqual(1, fakeLookup.PriceExistsCallCount);
         Assert.AreEqual(0, fakeLookup.LookupCallCount);
+
     }
 
     [TestMethod]
@@ -40,6 +45,7 @@ public class BillingServiceTests
         Assert.AreEqual("price_456", first);
         Assert.AreEqual("price_456", second);
         Assert.AreEqual(1, fakeLookup.LookupCallCount, "Lookup key should be cached after the first resolution.");
+
     }
 
     [TestMethod]
@@ -65,7 +71,9 @@ public class BillingServiceTests
             }
         });
 
+
         return new BillingService(options, lookupService, NullLogger<BillingService>.Instance);
+
     }
 
     private static Task<string> InvokeResolvePriceIdAsync(BillingService service, SubscriptionPlan plan)

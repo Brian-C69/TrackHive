@@ -20,12 +20,14 @@ public sealed class BillingService
     private readonly IReadOnlyDictionary<SubscriptionPlan, string> _configuredPrices;
     private readonly IStripePriceLookupService _priceLookupService;
     private readonly ConcurrentDictionary<string, string> _priceIdCache = new(StringComparer.OrdinalIgnoreCase);
+
     private readonly ILogger<BillingService> _logger;
 
     public BillingService(
         IOptions<StripeOptions> optionsAccessor,
         IStripePriceLookupService priceLookupService,
         ILogger<BillingService> logger)
+
     {
         _options = optionsAccessor?.Value ?? throw new ArgumentNullException(nameof(optionsAccessor));
 
@@ -37,7 +39,9 @@ public sealed class BillingService
         StripeConfiguration.ApiKey = _options.SecretKey;
         _configuredPrices = _options.Prices.AsDictionary();
         _priceLookupService = priceLookupService ?? throw new ArgumentNullException(nameof(priceLookupService));
+
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
         _sessionService = new SessionService();
         _subscriptionService = new SubscriptionService();
     }
