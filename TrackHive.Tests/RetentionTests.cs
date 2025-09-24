@@ -47,8 +47,8 @@ public sealed class RetentionTests
 
         await using (var seedContext = await CreateInitializedContextAsync(options))
         {
-            var freeOrg = new Organization { Name = "Free Org", CreatedByEmail = "free@example.com", Plan = OrganizationPlan.Free };
-            var paidOrg = new Organization { Name = "Pro Org", CreatedByEmail = "pro@example.com", Plan = OrganizationPlan.Pro };
+            var freeOrg = new Organization { Name = "Free Org", CreatedByEmail = "free@example.com", CurrentPlan = SubscriptionPlan.Free, SubscriptionPlan = SubscriptionPlan.Free };
+            var paidOrg = new Organization { Name = "Pro Org", CreatedByEmail = "pro@example.com", CurrentPlan = SubscriptionPlan.Pro, SubscriptionPlan = SubscriptionPlan.Pro };
             seedContext.Organizations.AddRange(freeOrg, paidOrg);
             await seedContext.SaveChangesAsync();
 
@@ -283,7 +283,7 @@ public sealed class RetentionTests
 
         await using (var seedContext = await CreateInitializedContextAsync(options))
         {
-            var org = new Organization { Name = "Free Org", CreatedByEmail = "hr@free.com", Plan = OrganizationPlan.Free };
+            var org = new Organization { Name = "Free Org", CreatedByEmail = "hr@free.com", CurrentPlan = SubscriptionPlan.Free, SubscriptionPlan = SubscriptionPlan.Free };
             seedContext.Organizations.Add(org);
             await seedContext.SaveChangesAsync();
 
@@ -365,7 +365,8 @@ public sealed class RetentionTests
             Name = "TrackHive"
         }));
 
-        var controller = new HrDashboardController(context, emailService)
+        var subscriptionUsage = new SubscriptionUsageService(context);
+        var controller = new HrDashboardController(context, emailService, subscriptionUsage)
         {
             ControllerContext = new ControllerContext
             {
@@ -399,7 +400,7 @@ public sealed class RetentionTests
 
         await using (var seedContext = await CreateInitializedContextAsync(options))
         {
-            var org = new Organization { Name = "Pro Org", CreatedByEmail = "hr@pro.com", Plan = OrganizationPlan.Pro };
+            var org = new Organization { Name = "Pro Org", CreatedByEmail = "hr@pro.com", CurrentPlan = SubscriptionPlan.Pro, SubscriptionPlan = SubscriptionPlan.Pro };
             seedContext.Organizations.Add(org);
             await seedContext.SaveChangesAsync();
 
@@ -468,7 +469,8 @@ public sealed class RetentionTests
             Name = "TrackHive"
         }));
 
-        var controller = new HrDashboardController(context, emailService)
+        var subscriptionUsage = new SubscriptionUsageService(context);
+        var controller = new HrDashboardController(context, emailService, subscriptionUsage)
         {
             ControllerContext = new ControllerContext
             {
@@ -500,7 +502,7 @@ public sealed class RetentionTests
 
         await using (var seedContext = await CreateInitializedContextAsync(options))
         {
-            var org = new Organization { Name = "Free Org", CreatedByEmail = "hr@free.com", Plan = OrganizationPlan.Free };
+            var org = new Organization { Name = "Free Org", CreatedByEmail = "hr@free.com", CurrentPlan = SubscriptionPlan.Free, SubscriptionPlan = SubscriptionPlan.Free };
             seedContext.Organizations.Add(org);
             await seedContext.SaveChangesAsync();
 
@@ -578,7 +580,7 @@ public sealed class RetentionTests
         Assert.IsNotNull(method);
 
         var task = (Task<System.Collections.Generic.List<PastPayrollRecordViewModel>>)method!
-            .Invoke(controller, new object?[] { employeeId, OrganizationPlan.Free })!;
+            .Invoke(controller, new object?[] { employeeId, SubscriptionPlan.Free })!;
         var history = await task;
 
         Assert.AreEqual(1, history.Count);
@@ -598,7 +600,7 @@ public sealed class RetentionTests
 
         await using (var seedContext = await CreateInitializedContextAsync(options))
         {
-            var org = new Organization { Name = "Pro Org", CreatedByEmail = "hr@pro.com", Plan = OrganizationPlan.Pro };
+            var org = new Organization { Name = "Pro Org", CreatedByEmail = "hr@pro.com", CurrentPlan = SubscriptionPlan.Pro, SubscriptionPlan = SubscriptionPlan.Pro };
             seedContext.Organizations.Add(org);
             await seedContext.SaveChangesAsync();
 
@@ -676,7 +678,7 @@ public sealed class RetentionTests
         Assert.IsNotNull(method);
 
         var task = (Task<System.Collections.Generic.List<PastPayrollRecordViewModel>>)method!
-            .Invoke(controller, new object?[] { employeeId, OrganizationPlan.Pro })!;
+            .Invoke(controller, new object?[] { employeeId, SubscriptionPlan.Pro })!;
         var history = await task;
 
         Assert.AreEqual(2, history.Count);

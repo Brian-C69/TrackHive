@@ -13,7 +13,6 @@ public sealed class HrDashboardViewModel
     public IReadOnlyList<LeaveBalanceSummaryViewModel> LeaveSummaries { get; init; } = Array.Empty<LeaveBalanceSummaryViewModel>();
     public IReadOnlyList<DashboardNotificationViewModel> Notifications { get; init; } = Array.Empty<DashboardNotificationViewModel>();
     public DashboardMetricsViewModel Metrics { get; init; } = new();
-    public OrganizationPlan Plan { get; init; } = OrganizationPlan.Free;
     public bool CanViewAnalytics { get; init; }
 }
 

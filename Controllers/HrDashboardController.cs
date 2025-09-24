@@ -447,17 +447,17 @@ public sealed class HrDashboardController : Controller
     private async Task<HrDashboardViewModel> BuildDashboardViewModelAsync(AppUser hr, InviteEmployeeViewModel? inviteOverride)
     {
         var org = await _db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == hr.OrganizationId);
-        var organizationPlan = org?.Plan ?? OrganizationPlan.Free;
+        var plan = org?.CurrentPlan ?? SubscriptionPlan.Free;
         var subscriptionPlan = org?.SubscriptionPlan ?? SubscriptionPlan.Free;
         var billingStart = org?.BillingPeriodStartUtc ?? hr.CreatedAt;
         var currentPeriodEnds = org?.CurrentPeriodEndsUtc;
         var trialEnds = org?.TrialEndsUtc;
 
         var now = DateTimeOffset.UtcNow;
-        var retentionCutoff = RetentionPolicy.GetCutoff(organizationPlan, now);
-        var retentionDateCutoff = RetentionPolicy.GetDateCutoff(organizationPlan, now);
+        var retentionCutoff = RetentionPolicy.GetCutoff(plan, now);
+        var retentionDateCutoff = RetentionPolicy.GetDateCutoff(plan, now);
         var invite = inviteOverride ?? new InviteEmployeeViewModel();
-        var canViewAnalytics = PlanHelper.CanViewAnalytics(organizationPlan);
+        var canViewAnalytics = PlanHelper.CanViewAnalytics(plan);
 
         var employees = await _db.Users
             .AsNoTracking()
@@ -915,7 +915,6 @@ public sealed class HrDashboardController : Controller
             LeaveSummaries = leaveSummaries,
             Notifications = orderedNotifications,
             Metrics = metrics,
-            Plan = organizationPlan,
             CanViewAnalytics = canViewAnalytics
         };
     }

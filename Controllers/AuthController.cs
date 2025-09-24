@@ -252,7 +252,6 @@ public sealed class AuthController : Controller
             Name = orgName,
             CreatedByEmail = model.Email.Trim(),
             CreatedAt = now,
-            Plan = OrganizationPlan.Free,
             CurrentPlan = SubscriptionPlan.Free,
             SubscriptionPlan = SubscriptionPlan.Free,
             BillingPeriodStartUtc = now,
