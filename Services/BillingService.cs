@@ -87,6 +87,7 @@ public sealed class BillingService
 
         var options = new SessionGetOptions();
         options.AddExpand("subscription");
+        options.AddExpand("subscription.items.data.price");
 
         try
         {
@@ -105,9 +106,12 @@ public sealed class BillingService
             return null;
         }
 
+        var options = new SubscriptionGetOptions();
+        options.AddExpand("items.data.price");
+
         try
         {
-            return await _subscriptionService.GetAsync(subscriptionId);
+            return await _subscriptionService.GetAsync(subscriptionId, options);
         }
         catch (StripeException)
         {
