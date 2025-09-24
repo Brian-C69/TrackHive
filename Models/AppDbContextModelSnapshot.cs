@@ -281,6 +281,11 @@ namespace TrackHive.Models
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+
+                    b.Property<int>("SubscriptionPlan")
+                        .HasColumnType("int");
+
+
                     b.Property<string>("StripeCustomerId")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -297,6 +302,7 @@ namespace TrackHive.Models
 
                     b.Property<DateTime?>("SubscriptionUpdatedAt")
                         .HasColumnType("datetime2");
+
 
                     b.HasKey("Id");
 

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using TrackHive.Models;
+using TrackHive.Services;
 
 namespace TrackHive.Controllers;
 
@@ -21,11 +22,13 @@ public sealed class DashboardController : Controller
 
     private readonly AppDbContext _db;
     private readonly EmailService _email;
+    private readonly SubscriptionUsageService _subscriptionUsage;
 
-    public DashboardController(AppDbContext db, EmailService email)
+    public DashboardController(AppDbContext db, EmailService email, SubscriptionUsageService subscriptionUsage)
     {
         _db = db;
         _email = email;
+        _subscriptionUsage = subscriptionUsage;
     }
 
     [Authorize(Roles = "IT")]
@@ -58,6 +61,17 @@ public sealed class DashboardController : Controller
         if (exists)
         {
             ModelState.AddModelError(nameof(InviteHRViewModel.Email), "This email is already registered.");
+            ViewData["OrgName"] = org.Name;
+            return View("Index", model);
+        }
+
+        var limitCheck = await _subscriptionUsage.CheckCanAddUserAsync(org.Id, RoleType.HR, HttpContext.RequestAborted);
+        if (!limitCheck.CanAdd)
+        {
+            var message = limitCheck.BlockReason
+                ?? "Invite blocked: your organization has reached the HR seat limit. Visit Billing to upgrade.";
+            model.ErrorMessage = message;
+            TempData["UpgradePrompt"] = message;
             ViewData["OrgName"] = org.Name;
             return View("Index", model);
         }
@@ -132,6 +146,15 @@ public sealed class DashboardController : Controller
         if (exists)
         {
             TempData["Error"] = "Email is already registered.";
+            return RedirectToAction(nameof(People), new { tab = returnTab });
+        }
+
+        var limitCheck = await _subscriptionUsage.CheckCanAddUserAsync(orgId, model.Role, HttpContext.RequestAborted);
+        if (!limitCheck.CanAdd)
+        {
+            var message = limitCheck.BlockReason
+                ?? "Invite blocked: you've reached the seat limit for your subscription. Visit Billing to upgrade.";
+            TempData["UpgradePrompt"] = message;
             return RedirectToAction(nameof(People), new { tab = returnTab });
         }
 

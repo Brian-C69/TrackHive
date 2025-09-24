@@ -250,8 +250,13 @@ public sealed class AuthController : Controller
         {
             Name = orgName,
             CreatedByEmail = model.Email.Trim(),
+
+            CreatedAt = DateTime.UtcNow,
+            SubscriptionPlan = SubscriptionPlan.Free
+
             Plan = OrganizationPlan.Free,
             CreatedAt = DateTime.UtcNow
+
         };
         _db.Organizations.Add(org);
         await _db.SaveChangesAsync(); // org.Id available

@@ -21,6 +21,7 @@ public sealed class Organization
     [Required]
     public SubscriptionPlan SubscriptionPlan { get; set; } = SubscriptionPlan.Free;
 
+
     [StringLength(200)]
     public string? StripeCustomerId { get; set; }
 
@@ -30,4 +31,5 @@ public sealed class Organization
     public DateTime? SubscriptionRenewsAt { get; set; }
 
     public DateTime? SubscriptionUpdatedAt { get; set; }
+
 }
