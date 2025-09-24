@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
 
@@ -16,49 +15,39 @@ namespace TrackHive.Tests;
 public class BillingServiceTests
 {
     [TestMethod]
-    public async Task ResolvePriceIdAsync_ReturnsConfiguredId_WhenValueAlreadyPriceId()
+    public async Task ResolvePriceIdAsync_ReturnsConfiguredId_ForConfiguredPlan()
     {
-
-        var fakeLookup = new FakePriceLookupService();
-        fakeLookup.PriceExistence["price_123"] = true;
-        var service = CreateService("price_123", fakeLookup);
-
+        var service = CreateService("price_123");
 
         var priceId = await InvokeResolvePriceIdAsync(service, SubscriptionPlan.Starter);
 
         Assert.AreEqual("price_123", priceId);
-        Assert.AreEqual(1, fakeLookup.PriceExistsCallCount);
-        Assert.AreEqual(0, fakeLookup.LookupCallCount);
-
     }
 
     [TestMethod]
-    public async Task ResolvePriceIdAsync_UsesLookupService_ForLookupKeys()
+    public async Task ResolvePriceIdAsync_ReturnsConfiguredId_ForDifferentPlans()
     {
-        var fakeLookup = new FakePriceLookupService();
-        fakeLookup.LookupResults["starter-monthly"] = "price_456";
-        var service = CreateService("starter-monthly", fakeLookup);
+        var service = CreateService("price_starter");
 
-        var first = await InvokeResolvePriceIdAsync(service, SubscriptionPlan.Starter);
-        var second = await InvokeResolvePriceIdAsync(service, SubscriptionPlan.Starter);
+        var starter = await InvokeResolvePriceIdAsync(service, SubscriptionPlan.Starter);
+        var pro = await InvokeResolvePriceIdAsync(service, SubscriptionPlan.Pro);
+        var enterprise = await InvokeResolvePriceIdAsync(service, SubscriptionPlan.Enterprise);
 
-        Assert.AreEqual("price_456", first);
-        Assert.AreEqual("price_456", second);
-        Assert.AreEqual(1, fakeLookup.LookupCallCount, "Lookup key should be cached after the first resolution.");
-
+        Assert.AreEqual("price_starter", starter);
+        Assert.AreEqual("price_pro", pro);
+        Assert.AreEqual("price_enterprise", enterprise);
     }
 
     [TestMethod]
-    public async Task ResolvePriceIdAsync_Throws_WhenLookupKeyMissing()
+    public async Task ResolvePriceIdAsync_Throws_WhenPriceNotConfigured()
     {
-        var fakeLookup = new FakePriceLookupService();
-        var service = CreateService("missing-key", fakeLookup);
+        var service = CreateService(string.Empty);
 
         await Assert.ThrowsExceptionAsync<InvalidOperationException>(
             () => InvokeResolvePriceIdAsync(service, SubscriptionPlan.Starter));
     }
 
-    private static BillingService CreateService(string starterValue, IStripePriceLookupService lookupService)
+    private static BillingService CreateService(string starterValue)
     {
         var options = Options.Create(new StripeOptions
         {
@@ -71,9 +60,7 @@ public class BillingServiceTests
             }
         });
 
-
-        return new BillingService(options, lookupService, NullLogger<BillingService>.Instance);
-
+        return new BillingService(options, NullLogger<BillingService>.Instance);
     }
 
     private static Task<string> InvokeResolvePriceIdAsync(BillingService service, SubscriptionPlan plan)
@@ -87,27 +74,5 @@ public class BillingServiceTests
             ?? throw new InvalidOperationException("ResolvePriceIdAsync did not return a Task<string>.");
 
         return task;
-    }
-
-    private sealed class FakePriceLookupService : IStripePriceLookupService
-    {
-        public Dictionary<string, string?> LookupResults { get; } = new();
-        public Dictionary<string, bool> PriceExistence { get; } = new();
-
-        public int LookupCallCount { get; private set; }
-        public int PriceExistsCallCount { get; private set; }
-
-        public Task<bool> PriceExistsAsync(string priceId)
-        {
-            PriceExistsCallCount++;
-            return Task.FromResult(PriceExistence.TryGetValue(priceId, out var exists) && exists);
-        }
-
-        public Task<string?> GetPriceIdByLookupKeyAsync(string lookupKey)
-        {
-            LookupCallCount++;
-            LookupResults.TryGetValue(lookupKey, out var value);
-            return Task.FromResult(value);
-        }
     }
 }

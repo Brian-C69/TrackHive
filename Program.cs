@@ -44,7 +44,6 @@ builder.Services.AddHostedService<DataRetentionService>();
 builder.Services.AddScoped<SubscriptionUsageService>();
 
 builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection("Stripe"));
-builder.Services.AddSingleton<IStripePriceLookupService, StripePriceLookupService>();
 builder.Services.AddSingleton<BillingService>();
 
 
