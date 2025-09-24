@@ -1,8 +1,12 @@
 ﻿@model TrackHive.Models.InviteHRViewModel
-@{
+@{ 
     ViewData["Title"] = "IT Dashboard";
     Layout = "~/Views/Shared/_Layout.App.cshtml";
     var orgName = (string?)ViewData["OrgName"] ?? "Organization";
+    var plan = ViewData["OrgPlan"] is SubscriptionPlan subscription ? subscription : SubscriptionPlan.Free;
+    var billingStart = ViewData["PlanBillingStart"] as DateTime?;
+    var periodEnds = ViewData["PlanPeriodEnds"] as DateTime?;
+    var trialEnds = ViewData["PlanTrialEnds"] as DateTime?;
 }
 <div class="row">
     <div class="col-12 col-xl-8">
@@ -10,6 +14,20 @@
             <div class="card-body p-4">
                 <h1 class="h5 mb-2">Welcome, IT (Super Admin)</h1>
                 <div class="text-secondary">Organization: <strong>@orgName</strong></div>
+                <div class="text-secondary mt-1">Plan: <strong>@plan</strong>
+                    @if (trialEnds.HasValue)
+                    {
+                        <span class="ms-2 badge rounded-pill bg-warning-subtle text-warning-emphasis">Trial ends @trialEnds.Value.ToLocalTime().ToString("MMM d, yyyy")</span>
+                    }
+                    else if (periodEnds.HasValue)
+                    {
+                        <span class="ms-2 small text-secondary">Renews @periodEnds.Value.ToLocalTime().ToString("MMM d, yyyy")</span>
+                    }
+                </div>
+                @if (billingStart.HasValue)
+                {
+                    <div class="text-secondary small">Billing period started @billingStart.Value.ToLocalTime().ToString("MMM d, yyyy")</div>
+                }
             </div>
         </div>
 

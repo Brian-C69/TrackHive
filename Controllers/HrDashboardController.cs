@@ -435,6 +435,10 @@ public sealed class HrDashboardController : Controller
     {
         var org = await _db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == hr.OrganizationId);
         var invite = inviteOverride ?? new InviteEmployeeViewModel();
+        var plan = org?.CurrentPlan ?? SubscriptionPlan.Free;
+        var billingStart = org?.BillingPeriodStartUtc ?? hr.CreatedAt;
+        var currentPeriodEnds = org?.CurrentPeriodEndsUtc;
+        var trialEnds = org?.TrialEndsUtc;
 
         var employees = await _db.Users
             .AsNoTracking()
@@ -821,6 +825,10 @@ public sealed class HrDashboardController : Controller
         return new HrDashboardViewModel
         {
             OrganizationName = org?.Name ?? "Organization",
+            CurrentPlan = plan,
+            BillingPeriodStartUtc = billingStart,
+            CurrentPeriodEndsUtc = currentPeriodEnds,
+            TrialEndsUtc = trialEnds,
             Invite = invite,
             PendingLeaveRequests = pendingViewModels,
             PendingCertificateRequests = certificateViewModels,

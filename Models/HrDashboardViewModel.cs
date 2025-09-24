@@ -3,6 +3,10 @@ namespace TrackHive.Models;
 public sealed class HrDashboardViewModel
 {
     public required string OrganizationName { get; init; }
+    public required SubscriptionPlan CurrentPlan { get; init; }
+    public required DateTime BillingPeriodStartUtc { get; init; }
+    public DateTime? CurrentPeriodEndsUtc { get; init; }
+    public DateTime? TrialEndsUtc { get; init; }
     public InviteEmployeeViewModel Invite { get; init; } = new();
     public IReadOnlyList<LeaveRequestReviewViewModel> PendingLeaveRequests { get; init; } = Array.Empty<LeaveRequestReviewViewModel>();
     public IReadOnlyList<LeaveCertificateReviewViewModel> PendingCertificateRequests { get; init; } = Array.Empty<LeaveCertificateReviewViewModel>();

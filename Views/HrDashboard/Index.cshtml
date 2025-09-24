@@ -1,9 +1,13 @@
 @using System.Text.Json
 @model TrackHive.Models.HrDashboardViewModel
-@{
+@{ 
     ViewData["Title"] = "HR Dashboard";
     Layout = "~/Views/Shared/_Layout.App.cshtml";
     var orgName = Model.OrganizationName;
+    var plan = Model.CurrentPlan;
+    var billingStart = Model.BillingPeriodStartUtc;
+    var periodEnds = Model.CurrentPeriodEndsUtc;
+    var trialEnds = Model.TrialEndsUtc;
     var metrics = Model.Metrics;
     var metricsJson = JsonSerializer.Serialize(metrics, new JsonSerializerOptions
     {
@@ -36,6 +40,17 @@
             <div class="card-body p-4">
                 <h1 class="h5 mb-2">Welcome, HR</h1>
                 <div class="text-secondary">Organization: <strong>@orgName</strong></div>
+                <div class="text-secondary mt-1">Plan: <strong>@plan</strong>
+                    @if (trialEnds.HasValue)
+                    {
+                        <span class="ms-2 badge rounded-pill bg-warning-subtle text-warning-emphasis">Trial ends @trialEnds.Value.ToLocalTime().ToString("MMM d, yyyy")</span>
+                    }
+                    else if (periodEnds.HasValue)
+                    {
+                        <span class="ms-2 small text-secondary">Renews @periodEnds.Value.ToLocalTime().ToString("MMM d, yyyy")</span>
+                    }
+                </div>
+                <div class="text-secondary small">Billing period started @billingStart.ToLocalTime().ToString("MMM d, yyyy")</div>
             </div>
         </div>
 
