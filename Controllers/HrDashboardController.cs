@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TrackHive.Models;
+using TrackHive.Services;
 
 namespace TrackHive.Controllers;
 
@@ -15,6 +16,7 @@ public sealed class HrDashboardController : Controller
 {
     private readonly AppDbContext _db;
     private readonly EmailService _email;
+    private readonly SubscriptionUsageService _subscriptionUsage;
     private const string LeaveActionMessageKey = "LeaveActionMessage";
     private const string LeaveActionErrorKey   = "LeaveActionError";
     private const string CertificateActionMessageKey = "CertificateActionMessage";
@@ -27,10 +29,11 @@ public sealed class HrDashboardController : Controller
         LeaveType.Unpaid    => "Unpaid leave",
         _                   => "Other leave"
     };
-    public HrDashboardController(AppDbContext db, EmailService email)
+    public HrDashboardController(AppDbContext db, EmailService email, SubscriptionUsageService subscriptionUsage)
     {
         _db = db;
         _email = email;
+        _subscriptionUsage = subscriptionUsage;
     }
 
     [HttpGet]
@@ -69,6 +72,16 @@ public sealed class HrDashboardController : Controller
         if (exists)
         {
             ModelState.AddModelError("Invite." + nameof(InviteEmployeeViewModel.Email), "This email is already registered.");
+            return View("Index", await BuildDashboardViewModelAsync(user, model));
+        }
+
+        var limitCheck = await _subscriptionUsage.CheckCanAddUserAsync(org.Id, RoleType.Employee, HttpContext.RequestAborted);
+        if (!limitCheck.CanAdd)
+        {
+            var message = limitCheck.BlockReason
+                ?? "Invite blocked: your plan has reached the employee seat limit. Visit Billing to upgrade.";
+            model.ErrorMessage = message;
+            TempData["UpgradePrompt"] = message;
             return View("Index", await BuildDashboardViewModelAsync(user, model));
         }
 

@@ -277,6 +277,9 @@ namespace TrackHive.Models
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<int>("SubscriptionPlan")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.ToTable("Organizations");

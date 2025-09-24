@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using TrackHive.Models;
+using TrackHive.Services;
 
 namespace TrackHive.Controllers;
 
@@ -13,10 +14,12 @@ namespace TrackHive.Controllers;
 public sealed class UsersController : Controller
 {
     private readonly AppDbContext _db;
+    private readonly SubscriptionUsageService _subscriptionUsage;
 
-    public UsersController(AppDbContext db)
+    public UsersController(AppDbContext db, SubscriptionUsageService subscriptionUsage)
     {
         _db = db;
+        _subscriptionUsage = subscriptionUsage;
     }
 
     [HttpGet]
@@ -176,6 +179,17 @@ public sealed class UsersController : Controller
         if (org is null)
         {
             ModelState.AddModelError(nameof(AdminUserFormViewModel.OrganizationId), "Organization not found.");
+            await PopulateOrganizationsAsync(model);
+            return View(model);
+        }
+
+        var limitCheck = await _subscriptionUsage.CheckCanAddUserAsync(org.Id, model.Role, HttpContext.RequestAborted);
+        if (!limitCheck.CanAdd)
+        {
+            var message = limitCheck.BlockReason
+                ?? "Invite blocked: your subscription plan has reached its seat limit. Visit Billing to upgrade.";
+            ViewData["UpgradePrompt"] = message;
+            ModelState.AddModelError(nameof(AdminUserFormViewModel.Role), message);
             await PopulateOrganizationsAsync(model);
             return View(model);
         }
