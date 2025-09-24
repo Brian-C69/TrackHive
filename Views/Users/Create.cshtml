@@ -9,6 +9,16 @@
     <a class="btn btn-outline-secondary" asp-action="Index">Back to list</a>
 </div>
 
+@{
+    var upgradePrompt = ViewData["UpgradePrompt"] as string ?? TempData["UpgradePrompt"] as string;
+}
+@if (!string.IsNullOrWhiteSpace(upgradePrompt))
+{
+    <div class="alert alert-warning" role="alert">
+        @upgradePrompt
+    </div>
+}
+
 <div class="card shadow-sm">
     <div class="card-body">
         <form asp-action="Create" method="post" class="row g-3">

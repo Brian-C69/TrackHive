@@ -246,11 +246,18 @@ public sealed class AuthController : Controller
 
         using var tx = await _db.Database.BeginTransactionAsync();
 
+        var now = DateTime.UtcNow;
         var org = new Organization
         {
             Name = orgName,
             CreatedByEmail = model.Email.Trim(),
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = now,
+            Plan = OrganizationPlan.Free,
+            CurrentPlan = SubscriptionPlan.Free,
+            SubscriptionPlan = SubscriptionPlan.Free,
+            BillingPeriodStartUtc = now,
+            CurrentPeriodEndsUtc = null,
+            TrialEndsUtc = now.AddDays(14)
         };
         _db.Organizations.Add(org);
         await _db.SaveChangesAsync(); // org.Id available

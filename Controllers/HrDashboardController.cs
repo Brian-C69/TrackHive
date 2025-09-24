@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TrackHive.Models;
+using TrackHive.Services;
 
 namespace TrackHive.Controllers;
 
@@ -15,6 +16,7 @@ public sealed class HrDashboardController : Controller
 {
     private readonly AppDbContext _db;
     private readonly EmailService _email;
+    private readonly SubscriptionUsageService _subscriptionUsage;
     private const string LeaveActionMessageKey = "LeaveActionMessage";
     private const string LeaveActionErrorKey   = "LeaveActionError";
     private const string CertificateActionMessageKey = "CertificateActionMessage";
@@ -27,10 +29,11 @@ public sealed class HrDashboardController : Controller
         LeaveType.Unpaid    => "Unpaid leave",
         _                   => "Other leave"
     };
-    public HrDashboardController(AppDbContext db, EmailService email)
+    public HrDashboardController(AppDbContext db, EmailService email, SubscriptionUsageService subscriptionUsage)
     {
         _db = db;
         _email = email;
+        _subscriptionUsage = subscriptionUsage;
     }
 
     [HttpGet]
@@ -69,6 +72,16 @@ public sealed class HrDashboardController : Controller
         if (exists)
         {
             ModelState.AddModelError("Invite." + nameof(InviteEmployeeViewModel.Email), "This email is already registered.");
+            return View("Index", await BuildDashboardViewModelAsync(user, model));
+        }
+
+        var limitCheck = await _subscriptionUsage.CheckCanAddUserAsync(org.Id, RoleType.Employee, HttpContext.RequestAborted);
+        if (!limitCheck.CanAdd)
+        {
+            var message = limitCheck.BlockReason
+                ?? "Invite blocked: your plan has reached the employee seat limit. Visit Billing to upgrade.";
+            model.ErrorMessage = message;
+            TempData["UpgradePrompt"] = message;
             return View("Index", await BuildDashboardViewModelAsync(user, model));
         }
 
@@ -434,7 +447,17 @@ public sealed class HrDashboardController : Controller
     private async Task<HrDashboardViewModel> BuildDashboardViewModelAsync(AppUser hr, InviteEmployeeViewModel? inviteOverride)
     {
         var org = await _db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == hr.OrganizationId);
+        var organizationPlan = org?.Plan ?? OrganizationPlan.Free;
+        var subscriptionPlan = org?.SubscriptionPlan ?? SubscriptionPlan.Free;
+        var billingStart = org?.BillingPeriodStartUtc ?? hr.CreatedAt;
+        var currentPeriodEnds = org?.CurrentPeriodEndsUtc;
+        var trialEnds = org?.TrialEndsUtc;
+
+        var now = DateTimeOffset.UtcNow;
+        var retentionCutoff = RetentionPolicy.GetCutoff(organizationPlan, now);
+        var retentionDateCutoff = RetentionPolicy.GetDateCutoff(organizationPlan, now);
         var invite = inviteOverride ?? new InviteEmployeeViewModel();
+        var canViewAnalytics = PlanHelper.CanViewAnalytics(organizationPlan);
 
         var employees = await _db.Users
             .AsNoTracking()
@@ -450,28 +473,48 @@ public sealed class HrDashboardController : Controller
             .Where(b => employeeIds.Contains(b.UserId))
             .ToDictionaryAsync(b => b.UserId);
 
-        var pendingRequests = await _db.LeaveRequests
+        var pendingRequestQuery = _db.LeaveRequests
             .AsNoTracking()
             .Include(r => r.User)
-            .Where(r => employeeIds.Contains(r.UserId) && r.Status == LeaveRequestStatus.Pending)
+            .Where(r => employeeIds.Contains(r.UserId) && r.Status == LeaveRequestStatus.Pending);
+
+        if (retentionCutoff is DateTimeOffset pendingCutoff)
+        {
+            pendingRequestQuery = pendingRequestQuery.Where(r => r.CreatedAt >= pendingCutoff);
+        }
+
+        var pendingRequests = await pendingRequestQuery
             .OrderBy(r => r.StartDate)
             .ThenBy(r => r.EndDate)
             .ToListAsync();
 
-        var certificatePendingRequests = await _db.LeaveRequests
+        var certificatePendingQuery = _db.LeaveRequests
             .AsNoTracking()
             .Include(r => r.User)
             .Include(r => r.Documents)
-            .Where(r => employeeIds.Contains(r.UserId) && r.Status == LeaveRequestStatus.AwaitingCertificateReview)
+            .Where(r => employeeIds.Contains(r.UserId) && r.Status == LeaveRequestStatus.AwaitingCertificateReview);
+
+        if (retentionCutoff is DateTimeOffset certificateCutoff)
+        {
+            certificatePendingQuery = certificatePendingQuery.Where(r => r.CreatedAt >= certificateCutoff);
+        }
+
+        var certificatePendingRequests = await certificatePendingQuery
             .OrderBy(r => r.StartDate)
             .ThenBy(r => r.EndDate)
             .ToListAsync();
 
-        var awaitingEmployeeCertificates = await _db.LeaveRequests
+        var awaitingCertificatesQuery = _db.LeaveRequests
             .AsNoTracking()
             .Include(r => r.User)
-            .Where(r => employeeIds.Contains(r.UserId) && r.Status == LeaveRequestStatus.ApprovedAwaitingCertificate)
-            .ToListAsync();
+            .Where(r => employeeIds.Contains(r.UserId) && r.Status == LeaveRequestStatus.ApprovedAwaitingCertificate);
+
+        if (retentionCutoff is DateTimeOffset awaitingCutoff)
+        {
+            awaitingCertificatesQuery = awaitingCertificatesQuery.Where(r => r.CreatedAt >= awaitingCutoff);
+        }
+
+        var awaitingEmployeeCertificates = await awaitingCertificatesQuery.ToListAsync();
 
         var pendingTotals = pendingRequests
             .GroupBy(r => r.UserId)
@@ -569,7 +612,7 @@ public sealed class HrDashboardController : Controller
         {
             var latestSubmission = certificatePendingRequests
                 .SelectMany(r => r.Documents.Select(d => d.UploadedAt))
-                .DefaultIfEmpty(DateTimeOffset.UtcNow)
+                .DefaultIfEmpty(now)
                 .Max();
 
             notifications.Add(new DashboardNotificationViewModel
@@ -585,7 +628,7 @@ public sealed class HrDashboardController : Controller
         {
             var mostRecentApproval = awaitingEmployeeCertificates
                 .Select(r => r.ReviewedAt ?? r.CreatedAt)
-                .DefaultIfEmpty(DateTimeOffset.UtcNow)
+                .DefaultIfEmpty(now)
                 .Max();
 
             notifications.Add(new DashboardNotificationViewModel
@@ -599,8 +642,8 @@ public sealed class HrDashboardController : Controller
 
         if (employeeIds.Count > 0)
         {
-            var statusHistoryCutoff = DateTimeOffset.UtcNow.AddDays(-7);
-            var recentDecisions = await _db.LeaveRequests
+            var statusHistoryCutoff = now.AddDays(-7);
+            var recentDecisionsQuery = _db.LeaveRequests
                 .AsNoTracking()
                 .Include(r => r.User)
                 .Where(r => employeeIds.Contains(r.UserId)
@@ -608,7 +651,14 @@ public sealed class HrDashboardController : Controller
                         || r.Status == LeaveRequestStatus.Rejected
                         || r.Status == LeaveRequestStatus.CertificateRejected)
                     && r.ReviewedAt != null
-                    && r.ReviewedAt >= statusHistoryCutoff)
+                    && r.ReviewedAt >= statusHistoryCutoff);
+
+            if (retentionCutoff is DateTimeOffset decisionsCutoff)
+            {
+                recentDecisionsQuery = recentDecisionsQuery.Where(r => r.CreatedAt >= decisionsCutoff);
+            }
+
+            var recentDecisions = await recentDecisionsQuery
                 .OrderByDescending(r => r.ReviewedAt)
                 .Take(5)
                 .ToListAsync();
@@ -637,7 +687,14 @@ public sealed class HrDashboardController : Controller
             }
 
             var lateThreshold = new TimeOnly(9, 30).ToTimeSpan();
-            var attendanceWindowStart = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-6));
+            var attendanceWindowStart = DateOnly.FromDateTime(now.AddDays(-6).UtcDateTime);
+            if (retentionDateCutoff is DateOnly retentionAttendance && retentionAttendance > attendanceWindowStart)
+            {
+                attendanceWindowStart = retentionAttendance;
+            }
+
+            static bool IsLate(DateTimeOffset checkInLocal, TimeSpan threshold) => checkInLocal.TimeOfDay > threshold;
+
             var recentAttendance = await _db.AttendanceRecords
                 .AsNoTracking()
                 .Where(a => employeeIds.Contains(a.UserId)
@@ -645,8 +702,6 @@ public sealed class HrDashboardController : Controller
                     && a.CheckInTime != null)
                 .Select(a => new { a.UserId, a.Date, a.CheckInTime })
                 .ToListAsync();
-
-            static bool IsLate(DateTimeOffset checkInLocal, TimeSpan threshold) => checkInLocal.TimeOfDay > threshold;
 
             var lateArrivals = recentAttendance
                 .Select(a => new
@@ -678,13 +733,18 @@ public sealed class HrDashboardController : Controller
                 });
             }
 
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            var monthStart = new DateOnly(today.Year, today.Month, 1);
-            var nextMonth = monthStart.AddMonths(1);
+            var today = DateOnly.FromDateTime(now.UtcDateTime);
+            var monthStartDate = new DateOnly(today.Year, today.Month, 1);
+            if (retentionDateCutoff is DateOnly retentionMonthStart && retentionMonthStart > monthStartDate)
+            {
+                monthStartDate = retentionMonthStart;
+            }
+
+            var nextMonth = monthStartDate.AddMonths(1);
             var monthAttendance = await _db.AttendanceRecords
                 .AsNoTracking()
                 .Where(a => employeeIds.Contains(a.UserId)
-                    && a.Date >= monthStart
+                    && a.Date >= monthStartDate
                     && a.Date < nextMonth)
                 .Select(a => new { a.UserId, a.Date, a.CheckInTime })
                 .ToListAsync();
@@ -701,9 +761,9 @@ public sealed class HrDashboardController : Controller
                 notifications.Add(new DashboardNotificationViewModel
                 {
                     Category = "Reports",
-                    Title = $"{monthStart:MMMM yyyy} attendance summary",
+                    Title = $"{monthStartDate:MMMM yyyy} attendance summary",
                     Message = $"{totalCheckIns} check-in(s) recorded across {employeesActive} employee(s) with {lateCount} late arrival(s).",
-                    CreatedAt = DateTimeOffset.UtcNow
+                    CreatedAt = now
                 });
             }
         }
@@ -713,9 +773,32 @@ public sealed class HrDashboardController : Controller
             .Take(10)
             .ToList();
 
-        var currentMonthUtc = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        var monthRange = Enumerable.Range(0, 6)
+        var currentMonthUtc = new DateTime(now.UtcDateTime.Year, now.UtcDateTime.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var monthCandidates = Enumerable.Range(0, 6)
             .Select(offset => currentMonthUtc.AddMonths(offset - 5))
+            .ToList();
+
+        if (retentionCutoff is DateTimeOffset monthCutoff)
+        {
+            var retentionMonth = new DateTime(monthCutoff.Year, monthCutoff.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            monthCandidates = monthCandidates
+                .Where(date => date >= retentionMonth)
+                .OrderBy(date => date)
+                .ToList();
+
+            if (!monthCandidates.Contains(currentMonthUtc))
+            {
+                monthCandidates.Add(currentMonthUtc);
+                monthCandidates = monthCandidates.OrderBy(date => date).ToList();
+            }
+        }
+
+        if (monthCandidates.Count == 0)
+        {
+            monthCandidates.Add(currentMonthUtc);
+        }
+
+        var monthRange = monthCandidates
             .Select(date => new
             {
                 Date = date,
@@ -723,16 +806,32 @@ public sealed class HrDashboardController : Controller
             })
             .ToList();
 
-        var monthlyTrends = new List<MonthlyLeaveTrendViewModel>();
+        var monthlyTrends = monthRange
+            .Select(info => new MonthlyLeaveTrendViewModel
+            {
+                MonthLabel = info.Label,
+                Pending = 0,
+                Approved = 0,
+                Rejected = 0
+            })
+            .ToList();
+
         var leaveTypeBreakdown = new List<LeaveTypeBreakdownViewModel>();
         var leavesReviewedThisMonth = 0;
 
-        if (employeeIds.Count > 0)
+        if (canViewAnalytics && employeeIds.Count > 0)
         {
             var earliestMonth = monthRange.First().Date;
-            var leaveHistory = await _db.LeaveRequests
+            var leaveHistoryQuery = _db.LeaveRequests
                 .AsNoTracking()
-                .Where(r => employeeIds.Contains(r.UserId) && r.CreatedAt >= earliestMonth)
+                .Where(r => employeeIds.Contains(r.UserId) && r.CreatedAt >= earliestMonth);
+
+            if (retentionCutoff is DateTimeOffset historyCutoff)
+            {
+                leaveHistoryQuery = leaveHistoryQuery.Where(r => r.CreatedAt >= historyCutoff);
+            }
+
+            var leaveHistory = await leaveHistoryQuery
                 .Select(r => new { r.CreatedAt, r.Status })
                 .ToListAsync();
 
@@ -748,38 +847,36 @@ public sealed class HrDashboardController : Controller
                         return (Pending: pending, Approved: approved, Rejected: rejected);
                     });
 
-            foreach (var info in monthRange)
+            for (var i = 0; i < monthRange.Count; i++)
             {
+                var info = monthRange[i];
                 if (monthlyLookup.TryGetValue(info.Date, out var counts))
                 {
-                    monthlyTrends.Add(new MonthlyLeaveTrendViewModel
+                    monthlyTrends[i] = new MonthlyLeaveTrendViewModel
                     {
                         MonthLabel = info.Label,
                         Pending = counts.Pending,
                         Approved = counts.Approved,
                         Rejected = counts.Rejected
-                    });
+                    };
 
                     if (info.Date == currentMonthUtc)
                     {
                         leavesReviewedThisMonth = counts.Approved + counts.Rejected;
                     }
                 }
-                else
-                {
-                    monthlyTrends.Add(new MonthlyLeaveTrendViewModel
-                    {
-                        MonthLabel = info.Label,
-                        Pending = 0,
-                        Approved = 0,
-                        Rejected = 0
-                    });
-                }
             }
 
-            var typeCounts = await _db.LeaveRequests
+            var leaveTypeQuery = _db.LeaveRequests
                 .AsNoTracking()
-                .Where(r => employeeIds.Contains(r.UserId))
+                .Where(r => employeeIds.Contains(r.UserId));
+
+            if (retentionCutoff is DateTimeOffset typeCutoff)
+            {
+                leaveTypeQuery = leaveTypeQuery.Where(r => r.CreatedAt >= typeCutoff);
+            }
+
+            var typeCounts = await leaveTypeQuery
                 .GroupBy(r => r.Type)
                 .Select(g => new { Type = g.Key, Count = g.Count() })
                 .ToListAsync();
@@ -790,19 +887,6 @@ public sealed class HrDashboardController : Controller
                 {
                     Type = FormatLeaveType(t.Type),
                     Count = t.Count
-                })
-                .ToList();
-        }
-
-        if (monthlyTrends.Count == 0)
-        {
-            monthlyTrends = monthRange
-                .Select(info => new MonthlyLeaveTrendViewModel
-                {
-                    MonthLabel = info.Label,
-                    Pending = 0,
-                    Approved = 0,
-                    Rejected = 0
                 })
                 .ToList();
         }
@@ -821,12 +905,18 @@ public sealed class HrDashboardController : Controller
         return new HrDashboardViewModel
         {
             OrganizationName = org?.Name ?? "Organization",
+            CurrentPlan = subscriptionPlan,
+            BillingPeriodStartUtc = billingStart,
+            CurrentPeriodEndsUtc = currentPeriodEnds,
+            TrialEndsUtc = trialEnds,
             Invite = invite,
             PendingLeaveRequests = pendingViewModels,
             PendingCertificateRequests = certificateViewModels,
             LeaveSummaries = leaveSummaries,
             Notifications = orderedNotifications,
-            Metrics = metrics
+            Metrics = metrics,
+            Plan = organizationPlan,
+            CanViewAnalytics = canViewAnalytics
         };
     }
 

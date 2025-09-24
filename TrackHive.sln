@@ -5,16 +5,22 @@ VisualStudioVersion = 17.14.36221.1 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TrackHive", "TrackHive.csproj", "{F6730F5E-6B30-4872-87A6-7DF762E1C4FB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TrackHive.Tests", "TrackHive.Tests/TrackHive.Tests.csproj", "{5E6A7B2C-31A5-47E9-8B47-48C02AE21565}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{F6730F5E-6B30-4872-87A6-7DF762E1C4FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{F6730F5E-6B30-4872-87A6-7DF762E1C4FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{F6730F5E-6B30-4872-87A6-7DF762E1C4FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{F6730F5E-6B30-4872-87A6-7DF762E1C4FB}.Release|Any CPU.Build.0 = Release|Any CPU
+                {F6730F5E-6B30-4872-87A6-7DF762E1C4FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+                {F6730F5E-6B30-4872-87A6-7DF762E1C4FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+                {F6730F5E-6B30-4872-87A6-7DF762E1C4FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+                {F6730F5E-6B30-4872-87A6-7DF762E1C4FB}.Release|Any CPU.Build.0 = Release|Any CPU
+                {5E6A7B2C-31A5-47E9-8B47-48C02AE21565}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+                {5E6A7B2C-31A5-47E9-8B47-48C02AE21565}.Debug|Any CPU.Build.0 = Debug|Any CPU
+                {5E6A7B2C-31A5-47E9-8B47-48C02AE21565}.Release|Any CPU.ActiveCfg = Release|Any CPU
+                {5E6A7B2C-31A5-47E9-8B47-48C02AE21565}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
