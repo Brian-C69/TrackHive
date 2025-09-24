@@ -1,4 +1,3 @@
-﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace TrackHive.Models;
@@ -21,6 +20,24 @@ public sealed class AppDbContext : DbContext
     {
 
         modelBuilder.Entity<Organization>()
+            .Property(o => o.CurrentPlan)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+
+        modelBuilder.Entity<Organization>()
+            .Property(o => o.BillingPeriodStartUtc)
+            .HasColumnType("datetime2");
+
+        modelBuilder.Entity<Organization>()
+            .Property(o => o.CurrentPeriodEndsUtc)
+            .HasColumnType("datetime2");
+
+        modelBuilder.Entity<Organization>()
+            .Property(o => o.TrialEndsUtc)
+            .HasColumnType("datetime2");
+
+
+        modelBuilder.Entity<Organization>()
             .HasIndex(o => o.StripeSubscriptionId)
             .IsUnique()
             .HasFilter("[StripeSubscriptionId] IS NOT NULL");
@@ -29,6 +46,7 @@ public sealed class AppDbContext : DbContext
         modelBuilder.Entity<Organization>()
             .Property(o => o.Plan)
             .HasDefaultValue(OrganizationPlan.Free);
+
 
         modelBuilder.Entity<AppUser>()
             .Property(u => u.BirthDate)

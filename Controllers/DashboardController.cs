@@ -37,6 +37,7 @@ public sealed class DashboardController : Controller
     {
         var orgId = GetOrgId();
         var org = await _db.Organizations.FindAsync(orgId);
+        SetPlanContext(org);
         ViewData["OrgName"] = org?.Name ?? "Organization";
         return View(new InviteHRViewModel());
     }
@@ -48,6 +49,7 @@ public sealed class DashboardController : Controller
     {
         var orgId = GetOrgId();
         var org = await _db.Organizations.FindAsync(orgId);
+        SetPlanContext(org);
 
         if (!ModelState.IsValid || org == null)
         {
@@ -195,6 +197,14 @@ public sealed class DashboardController : Controller
 
         var tab = user.Role == RoleType.HR ? "hr" : "employees";
         return RedirectToAction(nameof(People), new { tab });
+    }
+
+    private void SetPlanContext(Organization? org)
+    {
+        ViewData["OrgPlan"] = org?.CurrentPlan ?? SubscriptionPlan.Free;
+        ViewData["PlanBillingStart"] = org?.BillingPeriodStartUtc;
+        ViewData["PlanPeriodEnds"] = org?.CurrentPeriodEndsUtc;
+        ViewData["PlanTrialEnds"] = org?.TrialEndsUtc;
     }
 
     // Search + Pagination: /Dashboard/People?tab=employees|hr&q=...&page=1&pageSize=15

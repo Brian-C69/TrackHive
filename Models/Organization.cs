@@ -1,7 +1,15 @@
-﻿// File: Models/Organization.cs
+// File: Models/Organization.cs
 using System.ComponentModel.DataAnnotations;
 
 namespace TrackHive.Models;
+
+public enum SubscriptionPlan
+{
+    Free,
+    Starter,
+    Pro,
+    Enterprise
+}
 
 public sealed class Organization
 {
@@ -19,6 +27,15 @@ public sealed class Organization
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [Required]
+
+    public SubscriptionPlan CurrentPlan { get; set; } = SubscriptionPlan.Free;
+
+    public DateTime BillingPeriodStartUtc { get; set; } = DateTime.UtcNow;
+
+    public DateTime? CurrentPeriodEndsUtc { get; set; }
+
+    public DateTime? TrialEndsUtc { get; set; }
+
     public SubscriptionPlan SubscriptionPlan { get; set; } = SubscriptionPlan.Free;
 
 
@@ -31,5 +48,6 @@ public sealed class Organization
     public DateTime? SubscriptionRenewsAt { get; set; }
 
     public DateTime? SubscriptionUpdatedAt { get; set; }
+
 
 }
