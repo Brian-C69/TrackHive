@@ -16,6 +16,7 @@ public sealed class HrDashboardController : Controller
 {
     private readonly AppDbContext _db;
     private readonly EmailService _email;
+    private readonly SubscriptionUsageService _subscriptionUsage;
     private const string LeaveActionMessageKey = "LeaveActionMessage";
     private const string LeaveActionErrorKey   = "LeaveActionError";
     private const string CertificateActionMessageKey = "CertificateActionMessage";
@@ -28,10 +29,11 @@ public sealed class HrDashboardController : Controller
         LeaveType.Unpaid    => "Unpaid leave",
         _                   => "Other leave"
     };
-    public HrDashboardController(AppDbContext db, EmailService email)
+    public HrDashboardController(AppDbContext db, EmailService email, SubscriptionUsageService subscriptionUsage)
     {
         _db = db;
         _email = email;
+        _subscriptionUsage = subscriptionUsage;
     }
 
     [HttpGet]
@@ -70,6 +72,16 @@ public sealed class HrDashboardController : Controller
         if (exists)
         {
             ModelState.AddModelError("Invite." + nameof(InviteEmployeeViewModel.Email), "This email is already registered.");
+            return View("Index", await BuildDashboardViewModelAsync(user, model));
+        }
+
+        var limitCheck = await _subscriptionUsage.CheckCanAddUserAsync(org.Id, RoleType.Employee, HttpContext.RequestAborted);
+        if (!limitCheck.CanAdd)
+        {
+            var message = limitCheck.BlockReason
+                ?? "Invite blocked: your plan has reached the employee seat limit. Visit Billing to upgrade.";
+            model.ErrorMessage = message;
+            TempData["UpgradePrompt"] = message;
             return View("Index", await BuildDashboardViewModelAsync(user, model));
         }
 
@@ -441,6 +453,15 @@ public sealed class HrDashboardController : Controller
         var retentionDateCutoff = RetentionPolicy.GetDateCutoff(plan, now);
         var invite = inviteOverride ?? new InviteEmployeeViewModel();
 
+        var plan = org?.CurrentPlan ?? SubscriptionPlan.Free;
+        var billingStart = org?.BillingPeriodStartUtc ?? hr.CreatedAt;
+        var currentPeriodEnds = org?.CurrentPeriodEndsUtc;
+        var trialEnds = org?.TrialEndsUtc;
+
+        var plan = org?.Plan ?? OrganizationPlan.Free;
+        var canViewAnalytics = PlanHelper.CanViewAnalytics(plan);
+
+
         var employees = await _db.Users
             .AsNoTracking()
             .Where(u => u.OrganizationId == hr.OrganizationId && u.Role == RoleType.Employee)
@@ -753,6 +774,7 @@ public sealed class HrDashboardController : Controller
             .Take(10)
             .ToList();
 
+
         var currentMonthUtc = new DateTime(now.UtcDateTime.Year, now.UtcDateTime.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var monthCandidates = Enumerable.Range(0, 6)
             .Select(offset => currentMonthUtc.AddMonths(offset - 5))
@@ -788,10 +810,14 @@ public sealed class HrDashboardController : Controller
 
         var monthlyTrends = new List<MonthlyLeaveTrendViewModel>();
         var leaveTypeBreakdown = new List<LeaveTypeBreakdownViewModel>();
-        var leavesReviewedThisMonth = 0;
 
-        if (employeeIds.Count > 0)
+        var leavesReviewedThisMonth = 0;
+        IReadOnlyList<MonthlyLeaveTrendViewModel> monthlyTrends = Array.Empty<MonthlyLeaveTrendViewModel>();
+        IReadOnlyList<LeaveTypeBreakdownViewModel> leaveTypeBreakdown = Array.Empty<LeaveTypeBreakdownViewModel>();
+
+        if (canViewAnalytics)
         {
+
             var earliestMonth = monthRange.First().Date;
             var leaveHistoryQuery = _db.LeaveRequests
                 .AsNoTracking()
@@ -807,46 +833,100 @@ public sealed class HrDashboardController : Controller
                 .Select(r => new { r.CreatedAt, r.Status })
                 .ToListAsync();
 
-            var monthlyLookup = leaveHistory
-                .GroupBy(r => new DateTime(r.CreatedAt.Year, r.CreatedAt.Month, 1, 0, 0, 0, DateTimeKind.Utc))
-                .ToDictionary(
-                    g => g.Key,
-                    g =>
-                    {
-                        var pending = g.Count(x => x.Status == LeaveRequestStatus.Pending || x.Status == LeaveRequestStatus.AwaitingCertificateReview);
-                        var approved = g.Count(x => x.Status == LeaveRequestStatus.Approved || x.Status == LeaveRequestStatus.ApprovedAwaitingCertificate);
-                        var rejected = g.Count(x => x.Status == LeaveRequestStatus.Rejected || x.Status == LeaveRequestStatus.CertificateRejected);
-                        return (Pending: pending, Approved: approved, Rejected: rejected);
-                    });
-
-            foreach (var info in monthRange)
-            {
-                if (monthlyLookup.TryGetValue(info.Date, out var counts))
+            var currentMonthUtc = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            var monthRange = Enumerable.Range(0, 6)
+                .Select(offset => currentMonthUtc.AddMonths(offset - 5))
+                .Select(date => new
                 {
-                    monthlyTrends.Add(new MonthlyLeaveTrendViewModel
-                    {
-                        MonthLabel = info.Label,
-                        Pending = counts.Pending,
-                        Approved = counts.Approved,
-                        Rejected = counts.Rejected
-                    });
+                    Date = date,
+                    Label = date.ToString("MMM yyyy", CultureInfo.InvariantCulture)
+                })
+                .ToList();
 
-                    if (info.Date == currentMonthUtc)
+
+            var trendList = new List<MonthlyLeaveTrendViewModel>();
+            var breakdownList = new List<LeaveTypeBreakdownViewModel>();
+
+            if (employeeIds.Count > 0)
+            {
+                var earliestMonth = monthRange.First().Date;
+                var leaveHistory = await _db.LeaveRequests
+                    .AsNoTracking()
+                    .Where(r => employeeIds.Contains(r.UserId) && r.CreatedAt >= earliestMonth)
+                    .Select(r => new { r.CreatedAt, r.Status })
+                    .ToListAsync();
+
+                var monthlyLookup = leaveHistory
+                    .GroupBy(r => new DateTime(r.CreatedAt.Year, r.CreatedAt.Month, 1, 0, 0, 0, DateTimeKind.Utc))
+                    .ToDictionary(
+                        g => g.Key,
+                        g =>
+                        {
+                            var pending = g.Count(x => x.Status == LeaveRequestStatus.Pending || x.Status == LeaveRequestStatus.AwaitingCertificateReview);
+                            var approved = g.Count(x => x.Status == LeaveRequestStatus.Approved || x.Status == LeaveRequestStatus.ApprovedAwaitingCertificate);
+                            var rejected = g.Count(x => x.Status == LeaveRequestStatus.Rejected || x.Status == LeaveRequestStatus.CertificateRejected);
+                            return (Pending: pending, Approved: approved, Rejected: rejected);
+                        });
+
+                foreach (var info in monthRange)
+                {
+                    if (monthlyLookup.TryGetValue(info.Date, out var counts))
                     {
-                        leavesReviewedThisMonth = counts.Approved + counts.Rejected;
+                        trendList.Add(new MonthlyLeaveTrendViewModel
+                        {
+                            MonthLabel = info.Label,
+                            Pending = counts.Pending,
+                            Approved = counts.Approved,
+                            Rejected = counts.Rejected
+                        });
+
+                        if (info.Date == currentMonthUtc)
+                        {
+                            leavesReviewedThisMonth = counts.Approved + counts.Rejected;
+                        }
+                    }
+                    else
+                    {
+                        trendList.Add(new MonthlyLeaveTrendViewModel
+                        {
+                            MonthLabel = info.Label,
+                            Pending = 0,
+                            Approved = 0,
+                            Rejected = 0
+                        });
                     }
                 }
-                else
-                {
-                    monthlyTrends.Add(new MonthlyLeaveTrendViewModel
+
+                var typeCounts = await _db.LeaveRequests
+                    .AsNoTracking()
+                    .Where(r => employeeIds.Contains(r.UserId))
+                    .GroupBy(r => r.Type)
+                    .Select(g => new { Type = g.Key, Count = g.Count() })
+                    .ToListAsync();
+
+                breakdownList = typeCounts
+                    .OrderByDescending(t => t.Count)
+                    .Select(t => new LeaveTypeBreakdownViewModel
+                    {
+                        Type = FormatLeaveType(t.Type),
+                        Count = t.Count
+                    })
+                    .ToList();
+            }
+
+            if (trendList.Count == 0)
+            {
+                trendList = monthRange
+                    .Select(info => new MonthlyLeaveTrendViewModel
                     {
                         MonthLabel = info.Label,
                         Pending = 0,
                         Approved = 0,
                         Rejected = 0
-                    });
-                }
+                    })
+                    .ToList();
             }
+
 
             var leaveTypeQuery = _db.LeaveRequests
                 .AsNoTracking()
@@ -883,6 +963,10 @@ public sealed class HrDashboardController : Controller
                     Rejected = 0
                 })
                 .ToList();
+
+            monthlyTrends = trendList;
+            leaveTypeBreakdown = breakdownList;
+
         }
 
         var metrics = new DashboardMetricsViewModel
@@ -899,12 +983,18 @@ public sealed class HrDashboardController : Controller
         return new HrDashboardViewModel
         {
             OrganizationName = org?.Name ?? "Organization",
+            CurrentPlan = plan,
+            BillingPeriodStartUtc = billingStart,
+            CurrentPeriodEndsUtc = currentPeriodEnds,
+            TrialEndsUtc = trialEnds,
             Invite = invite,
             PendingLeaveRequests = pendingViewModels,
             PendingCertificateRequests = certificateViewModels,
             LeaveSummaries = leaveSummaries,
             Notifications = orderedNotifications,
-            Metrics = metrics
+            Metrics = metrics,
+            Plan = plan,
+            CanViewAnalytics = canViewAnalytics
         };
     }
 
