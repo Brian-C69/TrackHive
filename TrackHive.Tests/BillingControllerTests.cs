@@ -38,6 +38,16 @@ public class BillingControllerTests
     }
 
     [TestMethod]
+    public void AppendCheckoutSessionId_InsertsBeforeFragment()
+    {
+        var baseUrl = "https://example.com/Billing/Success?foo=bar#section";
+
+        var result = BillingController.AppendCheckoutSessionId(baseUrl);
+
+        Assert.AreEqual("https://example.com/Billing/Success?foo=bar&session_id={CHECKOUT_SESSION_ID}#section", result);
+    }
+
+    [TestMethod]
     public void AppendCheckoutSessionId_ThrowsForEmptyUrl()
     {
         Assert.ThrowsException<ArgumentException>(() => BillingController.AppendCheckoutSessionId(" "));
