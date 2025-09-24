@@ -21,6 +21,10 @@ public sealed class AppDbContext : DbContext
     {
 
 
+        modelBuilder.Entity<Organization>()
+            .Property(o => o.Plan)
+            .HasDefaultValue(OrganizationPlan.Free);
+
         modelBuilder.Entity<AppUser>()
             .Property(u => u.BirthDate)
             .HasColumnType("date");

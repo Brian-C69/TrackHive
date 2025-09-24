@@ -9,8 +9,29 @@
     var invariant = System.Globalization.CultureInfo.InvariantCulture;
     bool HasSavedRecord(TrackHive.Models.PayrollCalculationResult value) =>
         Model.History.Any(h => h.Year == value.Year && h.Month == value.Month);
+    var currentPlanName = PlanHelper.GetDisplayName(Model.Plan);
+    var payrollRequiredPlan = PlanHelper.GetDisplayName(PlanHelper.PayrollRequiredPlan);
+    var exportRequiredPlan = PlanHelper.GetDisplayName(PlanHelper.PdfRequiredPlan);
 }
 
+@if (!Model.CanUsePayroll)
+{
+    <div class="row g-4">
+        <div class="col-12 col-xl-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body p-5">
+                    <h1 class="h4 mb-3">Upgrade to unlock payroll</h1>
+                    <p class="text-secondary mb-3">
+                        Your organization is on the <strong>@currentPlanName</strong> plan. Payroll is available on the <strong>@payrollRequiredPlan</strong> plan and above.
+                    </p>
+                    <p class="text-secondary mb-0">Contact your TrackHive representative to upgrade and start calculating pay, storing history, and generating payslips.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
 <div class="row g-4">
     <div class="col-12 col-xl-7">
         <div class="card shadow-sm mb-4">
@@ -30,6 +51,13 @@
                 }
                 else
                 {
+                    if (!Model.CanExportPdf)
+                    {
+                        <div class="alert alert-info mb-3" role="alert">
+                            PDF exports are available on the <strong>@exportRequiredPlan</strong> plan.
+                        </div>
+                    }
+
                     if (!string.IsNullOrWhiteSpace(Model.AlertMessage))
                     {
                         <div class="alert alert-@Model.AlertType" role="alert">@Model.AlertMessage</div>
@@ -134,18 +162,25 @@
 
                     @{ var hasSavedRecord = HasSavedRecord(result); }
                     <div class="d-flex flex-wrap gap-2 align-items-center mb-4">
-                        <form asp-action="DownloadPayslip" asp-controller="Payroll" method="post" class="d-inline">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="SelectedEmployeeId" value="@result.EmployeeId" />
-                            <input type="hidden" name="Year" value="@Model.Form.Year" />
-                            <input type="hidden" name="Month" value="@Model.Form.Month" />
-                            <input type="hidden" name="ManualDeductions" value="@Model.Form.ManualDeductions.ToString(invariant)" />
-                            <input type="hidden" name="AdditionalOvertimeHours" value="@Model.Form.AdditionalOvertimeHours.ToString(invariant)" />
-                            <button type="submit" class="btn btn-outline-primary">Download payslip (PDF)</button>
-                        </form>
-                        <span class="text-secondary small">
-                            @(hasSavedRecord ? "Uses the stored payroll record for this period." : "Exports the current calculation if no saved record exists.")
-                        </span>
+                        @if (Model.CanExportPdf)
+                        {
+                            <form asp-action="DownloadPayslip" asp-controller="Payroll" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="SelectedEmployeeId" value="@result.EmployeeId" />
+                                <input type="hidden" name="Year" value="@Model.Form.Year" />
+                                <input type="hidden" name="Month" value="@Model.Form.Month" />
+                                <input type="hidden" name="ManualDeductions" value="@Model.Form.ManualDeductions.ToString(invariant)" />
+                                <input type="hidden" name="AdditionalOvertimeHours" value="@Model.Form.AdditionalOvertimeHours.ToString(invariant)" />
+                                <button type="submit" class="btn btn-outline-primary">Download payslip (PDF)</button>
+                            </form>
+                            <span class="text-secondary small">
+                                @(hasSavedRecord ? "Uses the stored payroll record for this period." : "Exports the current calculation if no saved record exists.")
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="text-secondary small">Upgrade to the @exportRequiredPlan plan to export payslips.</span>
+                        }
                     </div>
 
                     <div class="table-responsive mb-4">
@@ -232,11 +267,18 @@
             <div class="card-body p-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h2 class="h6 mb-0">Recent payroll history</h2>
-                    <a class="btn btn-sm btn-outline-secondary"
-                       asp-action="DownloadReport"
-                       asp-controller="Payroll"
-                       asp-route-year="@Model.Form.Year"
-                       asp-route-month="@Model.Form.Month">Export report (PDF)</a>
+                    @if (Model.CanExportPdf)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary"
+                           asp-action="DownloadReport"
+                           asp-controller="Payroll"
+                           asp-route-year="@Model.Form.Year"
+                           asp-route-month="@Model.Form.Month">Export report (PDF)</a>
+                    }
+                    else
+                    {
+                        <span class="text-secondary small">Upgrade to the @exportRequiredPlan plan to export monthly reports.</span>
+                    }
                 </div>
                 @if (Model.History.Count == 0)
                 {
@@ -267,7 +309,7 @@
                                         <td class="text-end text-secondary">@string.Format("${0:N2}", record.GrossPay)</td>
                                         <td class="text-end text-danger">@string.Format("${0:N2}", record.Deductions)</td>
                                         <td class="text-end">
-                                            @if (Model.Form.SelectedEmployeeId.HasValue)
+                                            @if (Model.CanExportPdf && Model.Form.SelectedEmployeeId.HasValue)
                                             {
                                                 <a class="btn btn-sm btn-outline-secondary"
                                                    asp-action="DownloadPayslip"
@@ -276,9 +318,13 @@
                                                    asp-route-year="@record.Year"
                                                    asp-route-month="@record.Month">Payslip</a>
                                             }
-                                            else
+                                            else if (Model.CanExportPdf)
                                             {
                                                 <span class="text-secondary">—</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-secondary small">Upgrade for PDFs</span>
                                             }
                                         </td>
                                     </tr>
@@ -291,5 +337,5 @@
         </div>
     </div>
 </div>
-
+}
 

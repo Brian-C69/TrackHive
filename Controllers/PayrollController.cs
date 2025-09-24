@@ -31,7 +31,9 @@ public sealed class PayrollController : Controller
         if (hr is null) return RedirectToAction("Login", "Auth");
         if (hr.MustChangePassword) return RedirectToAction("ChangePassword", "Auth");
 
-        var employees = await LoadEmployeesAsync(hr.OrganizationId);
+        var plan = await GetOrganizationPlanAsync(hr.OrganizationId);
+        var canUsePayroll = PlanHelper.CanAccessPayroll(plan);
+        var canExportPdf = PlanHelper.CanExportPdf(plan);
         var now = DateTime.UtcNow;
         var form = new PayrollCalculationForm
         {
@@ -41,6 +43,21 @@ public sealed class PayrollController : Controller
             ManualDeductions = 0m,
             AdditionalOvertimeHours = 0m
         };
+
+        if (!canUsePayroll)
+        {
+            var restrictedModel = new PayrollIndexViewModel
+            {
+                Plan = plan,
+                CanUsePayroll = false,
+                CanExportPdf = canExportPdf,
+                Form = form
+            };
+
+            return View(restrictedModel);
+        }
+
+        var employees = await LoadEmployeesAsync(hr.OrganizationId);
 
         PayrollCalculationResult? result = null;
         IReadOnlyList<PastPayrollRecordViewModel> history = Array.Empty<PastPayrollRecordViewModel>();
@@ -67,7 +84,10 @@ public sealed class PayrollController : Controller
             Result = result,
             History = history,
             AlertMessage = alertMessage,
-            AlertType = alertType
+            AlertType = alertType,
+            Plan = plan,
+            CanUsePayroll = true,
+            CanExportPdf = canExportPdf
         };
 
         return View(viewModel);
@@ -83,6 +103,23 @@ public sealed class PayrollController : Controller
 
         var form = postedModel.Form ?? new PayrollCalculationForm();
         postedModel.Form = form;
+        var plan = await GetOrganizationPlanAsync(hr.OrganizationId);
+        var canUsePayroll = PlanHelper.CanAccessPayroll(plan);
+        var canExportPdf = PlanHelper.CanExportPdf(plan);
+
+        if (!canUsePayroll)
+        {
+            var restrictedModel = new PayrollIndexViewModel
+            {
+                Plan = plan,
+                CanUsePayroll = false,
+                CanExportPdf = canExportPdf,
+                Form = form
+            };
+
+            return View("Index", restrictedModel);
+        }
+
         var employees = await LoadEmployeesAsync(hr.OrganizationId);
         PayrollCalculationResult? result = null;
         IReadOnlyList<PastPayrollRecordViewModel> history = Array.Empty<PastPayrollRecordViewModel>();
@@ -157,7 +194,10 @@ public sealed class PayrollController : Controller
             Result = result,
             History = history,
             AlertMessage = alertMessage,
-            AlertType = alertType
+            AlertType = alertType,
+            Plan = plan,
+            CanUsePayroll = true,
+            CanExportPdf = canExportPdf
         };
 
         return View("Index", viewModel);
@@ -170,6 +210,23 @@ public sealed class PayrollController : Controller
         if (hr is null) return RedirectToAction("Login", "Auth");
         if (hr.MustChangePassword) return RedirectToAction("ChangePassword", "Auth");
 
+        var plan = await GetOrganizationPlanAsync(hr.OrganizationId);
+        var canUsePayroll = PlanHelper.CanAccessPayroll(plan);
+        var canExportPdf = PlanHelper.CanExportPdf(plan);
+        var routeValues = new { employeeId, year, month };
+
+        if (!canUsePayroll)
+        {
+            SetTempAlert($"Upgrade to the {PlanHelper.GetDisplayName(PlanHelper.PayrollRequiredPlan)} plan to manage payroll.", "info");
+            return RedirectToAction("Index", routeValues);
+        }
+
+        if (!canExportPdf)
+        {
+            SetTempAlert($"PDF exports are available on the {PlanHelper.GetDisplayName(PlanHelper.PdfRequiredPlan)} plan.", "info");
+            return RedirectToAction("Index", routeValues);
+        }
+
         var form = new PayrollCalculationForm
         {
             SelectedEmployeeId = employeeId,
@@ -178,8 +235,6 @@ public sealed class PayrollController : Controller
             ManualDeductions = 0m,
             AdditionalOvertimeHours = 0m
         };
-
-        var routeValues = new { employeeId, year, month };
 
         var result = await TryCreatePayslipAsync(hr, form, allowRecalculation: false);
         if (result.Document is null)
@@ -203,7 +258,22 @@ public sealed class PayrollController : Controller
         if (hr is null) return RedirectToAction("Login", "Auth");
         if (hr.MustChangePassword) return RedirectToAction("ChangePassword", "Auth");
 
+        var plan = await GetOrganizationPlanAsync(hr.OrganizationId);
+        var canUsePayroll = PlanHelper.CanAccessPayroll(plan);
+        var canExportPdf = PlanHelper.CanExportPdf(plan);
         var routeValues = new { employeeId = form.SelectedEmployeeId, year = form.Year, month = form.Month };
+
+        if (!canUsePayroll)
+        {
+            SetTempAlert($"Upgrade to the {PlanHelper.GetDisplayName(PlanHelper.PayrollRequiredPlan)} plan to manage payroll.", "info");
+            return RedirectToAction("Index", routeValues);
+        }
+
+        if (!canExportPdf)
+        {
+            SetTempAlert($"PDF exports are available on the {PlanHelper.GetDisplayName(PlanHelper.PdfRequiredPlan)} plan.", "info");
+            return RedirectToAction("Index", routeValues);
+        }
 
         var result = await TryCreatePayslipAsync(hr, form, allowRecalculation: true);
         if (result.Document is null)
@@ -225,6 +295,22 @@ public sealed class PayrollController : Controller
         var hr = await GetCurrentUserAsync();
         if (hr is null) return RedirectToAction("Login", "Auth");
         if (hr.MustChangePassword) return RedirectToAction("ChangePassword", "Auth");
+
+        var plan = await GetOrganizationPlanAsync(hr.OrganizationId);
+        var canUsePayroll = PlanHelper.CanAccessPayroll(plan);
+        var canExportPdf = PlanHelper.CanExportPdf(plan);
+
+        if (!canUsePayroll)
+        {
+            SetTempAlert($"Upgrade to the {PlanHelper.GetDisplayName(PlanHelper.PayrollRequiredPlan)} plan to manage payroll.", "info");
+            return RedirectToAction("Index", new { year, month });
+        }
+
+        if (!canExportPdf)
+        {
+            SetTempAlert($"PDF exports are available on the {PlanHelper.GetDisplayName(PlanHelper.PdfRequiredPlan)} plan.", "info");
+            return RedirectToAction("Index", new { year, month });
+        }
 
         if (year < 2000 || year > 2100 || month < 1 || month > 12)
         {
@@ -423,6 +509,15 @@ public sealed class PayrollController : Controller
     }
 
     private sealed record PayslipGenerationResult(PayslipDocumentModel? Document, string? ErrorMessage, string AlertType);
+
+    private async Task<OrganizationPlan> GetOrganizationPlanAsync(int organizationId)
+    {
+        return await _db.Organizations
+            .AsNoTracking()
+            .Where(o => o.Id == organizationId)
+            .Select(o => o.Plan)
+            .FirstOrDefaultAsync();
+    }
 
     private async Task<AppUser?> GetCurrentUserAsync()
     {
