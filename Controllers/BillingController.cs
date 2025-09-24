@@ -125,12 +125,13 @@ public sealed class BillingController : Controller
         catch (StripeException ex)
         {
             _logger.LogError(ex, "Failed to create Stripe checkout session for organization {OrgId}", orgId);
-            TempData["Error"] = "We couldn't start the checkout session. Please try again.";
+            var reason = ex.StripeError?.Message ?? ex.Message;
+            TempData["Error"] = $"We couldn't start the checkout session. {reason}";
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to start billing upgrade for organization {OrgId}", orgId);
-            TempData["Error"] = "Something went wrong while starting the checkout. Please try again.";
+            TempData["Error"] = $"Something went wrong while starting the checkout: {ex.Message}";
         }
 
         return RedirectToAction(nameof(Upgrade));
@@ -212,19 +213,88 @@ public sealed class BillingController : Controller
             return RedirectToAction(nameof(Failed));
         }
 
-        var plan = TryGetPlan(session.Metadata, out var parsedPlan) ? parsedPlan : SubscriptionPlan.Starter;
-
-        var orgId = GetOrgId();
-        var org = await _db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orgId);
-        if (org is not null)
+        Subscription? subscription = session.Subscription as Subscription;
+        if (subscription is null && !string.IsNullOrWhiteSpace(session.SubscriptionId))
         {
-            ViewData["OrgName"] = org.Name;
+            subscription = await _billing.GetSubscriptionAsync(session.SubscriptionId);
         }
 
-        DateTime? renewsAt = null;
-        if (session.Subscription is Subscription subscription)
+        var metadataOrgId = TryGetOrganizationId(session.Metadata, out var parsedOrgId) ? parsedOrgId : (int?)null;
+        var fallbackOrgId = GetOrgId();
+        var resolvedOrgId = metadataOrgId ?? (fallbackOrgId > 0 ? fallbackOrgId : (int?)null);
+
+        if (metadataOrgId is null && fallbackOrgId > 0)
         {
-            renewsAt = NormalizeToUtc(GetSubscriptionPeriodEnd(subscription));
+            _logger.LogInformation(
+                "Checkout session {SessionId} missing organization metadata. Falling back to authenticated organization {OrgId}.",
+                session.Id,
+                fallbackOrgId);
+        }
+        else if (metadataOrgId is not null && fallbackOrgId > 0 && metadataOrgId.Value != fallbackOrgId)
+        {
+            _logger.LogWarning(
+                "Checkout session {SessionId} metadata organization {MetadataOrgId} differs from authenticated organization {OrgId}.",
+                session.Id,
+                metadataOrgId.Value,
+                fallbackOrgId);
+        }
+
+        if (resolvedOrgId is null)
+        {
+            TempData["Error"] = "We couldn't determine which organization to update.";
+            return RedirectToAction(nameof(Failed));
+        }
+
+        var orgSnapshot = await _db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == resolvedOrgId.Value);
+        if (orgSnapshot is not null)
+        {
+            ViewData["OrgName"] = orgSnapshot.Name;
+        }
+
+        var fallbackPlan = orgSnapshot?.SubscriptionPlan ?? SubscriptionPlan.Starter;
+        var plan = TryGetPlan(session.Metadata, out var parsedPlan)
+            ? parsedPlan
+            : ResolvePlanFromSubscription(subscription, fallbackPlan);
+
+        DateTime? renewsAt = NormalizeToUtc(GetSubscriptionPeriodEnd(subscription));
+
+        var updateSucceeded = true;
+        try
+        {
+            await UpdateOrganizationSubscriptionAsync(
+                resolvedOrgId.Value,
+                plan,
+                session.CustomerId,
+                subscription?.Id ?? session.SubscriptionId,
+                renewsAt);
+        }
+        catch (Exception ex)
+        {
+            updateSucceeded = false;
+            _logger.LogError(ex, "Failed to persist subscription upgrade for organization {OrgId} from session {SessionId}.", resolvedOrgId.Value, session.Id);
+            TempData["Warning"] = "Payment succeeded but we couldn't sync your organization automatically. Please contact support.";
+        }
+
+        if (updateSucceeded)
+        {
+            var updatedOrg = await _db.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == resolvedOrgId.Value);
+            if (updatedOrg is not null)
+            {
+                plan = updatedOrg.SubscriptionPlan;
+                ViewData["OrgName"] = updatedOrg.Name;
+                if (updatedOrg.SubscriptionRenewsAt.HasValue)
+                {
+                    renewsAt = NormalizeToUtc(updatedOrg.SubscriptionRenewsAt);
+                }
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Organization {OrgId} was not found after processing checkout session {SessionId}.",
+                    resolvedOrgId.Value,
+                    session.Id);
+                TempData["Warning"] = "Payment succeeded but we couldn't sync your organization automatically. Please contact support.";
+            }
         }
 
         var vm = new BillingStatusViewModel

@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
+
+using Microsoft.Extensions.Logging.Abstractions;
+
 using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using TrackHive.Models;
@@ -15,11 +18,18 @@ public class BillingServiceTests
     [TestMethod]
     public async Task ResolvePriceIdAsync_ReturnsConfiguredId_WhenValueAlreadyPriceId()
     {
-        var service = CreateService("price_123", new FakePriceLookupService());
+
+        var fakeLookup = new FakePriceLookupService();
+        fakeLookup.PriceExistence["price_123"] = true;
+        var service = CreateService("price_123", fakeLookup);
+
 
         var priceId = await InvokeResolvePriceIdAsync(service, SubscriptionPlan.Starter);
 
         Assert.AreEqual("price_123", priceId);
+        Assert.AreEqual(1, fakeLookup.PriceExistsCallCount);
+        Assert.AreEqual(0, fakeLookup.LookupCallCount);
+
     }
 
     [TestMethod]
@@ -34,7 +44,8 @@ public class BillingServiceTests
 
         Assert.AreEqual("price_456", first);
         Assert.AreEqual("price_456", second);
-        Assert.AreEqual(1, fakeLookup.CallCount, "Lookup key should be cached after the first resolution.");
+        Assert.AreEqual(1, fakeLookup.LookupCallCount, "Lookup key should be cached after the first resolution.");
+
     }
 
     [TestMethod]
@@ -60,7 +71,9 @@ public class BillingServiceTests
             }
         });
 
-        return new BillingService(options, lookupService);
+
+        return new BillingService(options, lookupService, NullLogger<BillingService>.Instance);
+
     }
 
     private static Task<string> InvokeResolvePriceIdAsync(BillingService service, SubscriptionPlan plan)
@@ -79,12 +92,20 @@ public class BillingServiceTests
     private sealed class FakePriceLookupService : IStripePriceLookupService
     {
         public Dictionary<string, string?> LookupResults { get; } = new();
+        public Dictionary<string, bool> PriceExistence { get; } = new();
 
-        public int CallCount { get; private set; }
+        public int LookupCallCount { get; private set; }
+        public int PriceExistsCallCount { get; private set; }
+
+        public Task<bool> PriceExistsAsync(string priceId)
+        {
+            PriceExistsCallCount++;
+            return Task.FromResult(PriceExistence.TryGetValue(priceId, out var exists) && exists);
+        }
 
         public Task<string?> GetPriceIdByLookupKeyAsync(string lookupKey)
         {
-            CallCount++;
+            LookupCallCount++;
             LookupResults.TryGetValue(lookupKey, out var value);
             return Task.FromResult(value);
         }

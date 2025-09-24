@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Stripe;
 using Stripe.Checkout;
@@ -20,9 +21,13 @@ public sealed class BillingService
     private readonly IStripePriceLookupService _priceLookupService;
     private readonly ConcurrentDictionary<string, string> _priceIdCache = new(StringComparer.OrdinalIgnoreCase);
 
+    private readonly ILogger<BillingService> _logger;
+
     public BillingService(
         IOptions<StripeOptions> optionsAccessor,
-        IStripePriceLookupService priceLookupService)
+        IStripePriceLookupService priceLookupService,
+        ILogger<BillingService> logger)
+
     {
         _options = optionsAccessor?.Value ?? throw new ArgumentNullException(nameof(optionsAccessor));
 
@@ -34,6 +39,9 @@ public sealed class BillingService
         StripeConfiguration.ApiKey = _options.SecretKey;
         _configuredPrices = _options.Prices.AsDictionary();
         _priceLookupService = priceLookupService ?? throw new ArgumentNullException(nameof(priceLookupService));
+
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
         _sessionService = new SessionService();
         _subscriptionService = new SubscriptionService();
     }
@@ -131,14 +139,22 @@ public sealed class BillingService
             throw new InvalidOperationException($"Stripe price ID is not configured for plan '{plan}'.");
         }
 
-        if (configuredValue.StartsWith("price_", StringComparison.OrdinalIgnoreCase))
-        {
-            return configuredValue;
-        }
-
         if (_priceIdCache.TryGetValue(configuredValue, out var cached))
         {
             return cached;
+        }
+
+        if (configuredValue.StartsWith("price_", StringComparison.OrdinalIgnoreCase))
+        {
+            if (await _priceLookupService.PriceExistsAsync(configuredValue))
+            {
+                _priceIdCache[configuredValue] = configuredValue;
+                return configuredValue;
+            }
+
+            _logger.LogWarning(
+                "Stripe price '{ConfiguredValue}' is configured but does not exist. Falling back to lookup key resolution.",
+                configuredValue);
         }
 
         var priceId = await _priceLookupService.GetPriceIdByLookupKeyAsync(configuredValue);
