@@ -1,0 +1,40 @@
+@model TrackHive.Models.BillingStatusViewModel
+@{
+    Layout = "~/Views/Shared/_Layout.App.cshtml";
+    var orgName = ViewData["OrgName"] as string ?? "your organization";
+    var planName = Model.Plan.GetDisplayName();
+    var renewsAt = Model.RenewsAt;
+    var localRenewsAt = renewsAt?.ToLocalTime();
+}
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-10 col-xl-8">
+        <div class="card shadow-sm">
+            <div class="card-body p-5 text-center">
+                <i class="bi bi-check-circle-fill text-success display-4 mb-3" aria-hidden="true"></i>
+                <h1 class="h3 mb-3">@Model.Title</h1>
+                <p class="lead mb-4">@Model.Message</p>
+
+                <div class="alert alert-success" role="status">
+                    <strong>@planName</strong> features are now unlocked for <strong>@orgName</strong>.
+                </div>
+
+                @if (localRenewsAt.HasValue)
+                {
+                    <p class="text-secondary small mb-4">
+                        Renews on <strong>@localRenewsAt.Value:MMMM d, yyyy</strong> at <strong>@localRenewsAt.Value:HH:mm tt</strong> (local time).
+                    </p>
+                }
+
+                <div class="d-grid d-sm-flex justify-content-center gap-2 mt-4">
+                    <a class="btn btn-primary" asp-controller="Dashboard" asp-action="Index">
+                        Continue inviting HR admins
+                    </a>
+                    <a class="btn btn-outline-secondary" asp-controller="Dashboard" asp-action="People">
+                        Manage people directory
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

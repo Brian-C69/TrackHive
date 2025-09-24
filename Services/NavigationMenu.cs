@@ -15,6 +15,7 @@ public static class NavigationMenu
                 new("it-dashboard", "IT Dashboard", "bi-speedometer2", "Dashboard", "Index", "Main"),
                 new("users", "All users", "bi-diagram-3", "Users", "Index", "Admin"),
                 new("people", "People", "bi-people", "Dashboard", "People", "Admin"),
+                new("billing", "Billing & Plans", "bi-credit-card", "Billing", "Upgrade", "Admin"),
                 new("preferences", "Preferences", "bi-sliders2", "Profile", "Preferences", "Admin"),
                 new("profile", "My profile", "bi-person-circle", "Profile", "Index", "Admin"),
             },

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TrackHive.Models;
 
@@ -11,9 +12,10 @@ using TrackHive.Models;
 namespace TrackHive.Models
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251215093000_OrganizationPlans")]
+    partial class OrganizationPlans
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -281,34 +283,7 @@ namespace TrackHive.Models
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-
-                    b.Property<int>("SubscriptionPlan")
-                        .HasColumnType("int");
-
-
-                    b.Property<string>("StripeCustomerId")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("StripeSubscriptionId")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime?>("SubscriptionRenewsAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("SubscriptionPlan")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("SubscriptionUpdatedAt")
-                        .HasColumnType("datetime2");
-
-
                     b.HasKey("Id");
-
-                    b.HasIndex("StripeSubscriptionId")
-                        .IsUnique()
-                        .HasFilter("[StripeSubscriptionId] IS NOT NULL");
 
                     b.ToTable("Organizations");
                 });

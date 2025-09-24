@@ -29,6 +29,8 @@
         LeaveType.Unpaid => "Unpaid leave",
         _ => "Other leave"
     };
+    var analyticsRequiredPlan = PlanHelper.GetDisplayName(PlanHelper.AnalyticsRequiredPlan);
+    var currentPlanName = PlanHelper.GetDisplayName(Model.Plan);
 }
 <div class="row">
     <div class="col-12 col-xl-8">
@@ -39,43 +41,56 @@
             </div>
         </div>
 
-        <div class="row g-3 mt-4 align-items-stretch">
-            <!-- Left: Leave decisions by month -->
-            <div class="col-12 col-lg-8">
-                <div class="border rounded-3 p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h3 class="h6 mb-0">Leave decisions by month</h3>
-                        <span class="text-secondary small">Past six months</span>
-                    </div>
-                    <div class="ratio ratio-16x9 bg-body-tertiary rounded-3">
-                        <canvas id="leaveTrendChart" role="img"
-                                aria-label="Line chart showing leave decisions by month"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right: Leave type distribution -->
-            <div class="col-12 col-lg-4">
-                <div class="border rounded-3 p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h3 class="h6 mb-0">Leave type distribution</h3>
-                        <span class="text-secondary small">All recorded requests</span>
-                    </div>
-
-                    @if (metrics.LeaveTypeBreakdown.Count == 0)
-                    {
-                        <p class="text-secondary small mb-0">No leave requests have been recorded yet.</p>
-                    }
-                    else
-                    {
-                        <div class="ratio ratio-1x1 bg-body-tertiary rounded-3">
-                            <canvas id="leaveTypeChart" role="img"
-                                    aria-label="Doughnut chart showing leave type distribution"></canvas>
+        @if (Model.CanViewAnalytics)
+        {
+            <div class="card shadow-sm mb-4 mt-4" id="hrMetricsCard">
+                <div class="card-body p-4">
+                    <div class="row g-3 align-items-stretch">
+                        <div class="col-12 col-lg-8">
+                            <div class="border rounded-3 p-3 h-100">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h3 class="h6 mb-0">Leave decisions by month</h3>
+                                    <span class="text-secondary small">Past six months</span>
+                                </div>
+                                <div class="ratio ratio-16x9 bg-body-tertiary rounded-3">
+                                    <canvas id="leaveTrendChart" role="img"
+                                            aria-label="Line chart showing leave decisions by month"></canvas>
+                                </div>
+                            </div>
                         </div>
-                    }
+                        <div class="col-12 col-lg-4">
+                            <div class="border rounded-3 p-3 h-100">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h3 class="h6 mb-0">Leave type distribution</h3>
+                                    <span class="text-secondary small">All recorded requests</span>
+                                </div>
+
+                                @if (metrics.LeaveTypeBreakdown.Count == 0)
+                                {
+                                    <p class="text-secondary small mb-0">No leave requests have been recorded yet.</p>
+                                }
+                                else
+                                {
+                                    <div class="ratio ratio-1x1 bg-body-tertiary rounded-3">
+                                        <canvas id="leaveTypeChart" role="img"
+                                                aria-label="Doughnut chart showing leave type distribution"></canvas>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
+        }
+        else
+        {
+            <div class="card shadow-sm mb-4 mt-4">
+                <div class="card-body p-5">
+                    <h2 class="h5 mb-2">Upgrade to unlock HR analytics</h2>
+                    <p class="text-secondary mb-0">Your organization is on the <strong>@currentPlanName</strong> plan. Charts and metrics are available on the <strong>@analyticsRequiredPlan</strong> plan and above.</p>
+                </div>
+            </div>
+        }
 
 
         <div class="card shadow-sm mb-4">
