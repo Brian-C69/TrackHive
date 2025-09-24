@@ -8,6 +8,13 @@ public sealed class StripeOptions
     public string PublishableKey { get; set; } = string.Empty;
     public string SecretKey { get; set; } = string.Empty;
     public string WebhookSecret { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Optional base URL used to build Stripe success/cancel redirects.
+    /// When not provided the application falls back to the current HTTP request.
+    /// </summary>
+    public string? CheckoutRedirectBaseUrl { get; set; }
+
     public StripePriceOptions Prices { get; set; } = new();
 
     public sealed class StripePriceOptions
