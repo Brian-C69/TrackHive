@@ -1,5 +1,6 @@
 // File: Services/BillingService.cs
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
@@ -15,9 +16,13 @@ public sealed class BillingService
     private readonly StripeOptions _options;
     private readonly SessionService _sessionService;
     private readonly SubscriptionService _subscriptionService;
-    private readonly IReadOnlyDictionary<SubscriptionPlan, string> _priceLookup;
+    private readonly IReadOnlyDictionary<SubscriptionPlan, string> _configuredPrices;
+    private readonly IStripePriceLookupService _priceLookupService;
+    private readonly ConcurrentDictionary<string, string> _priceIdCache = new(StringComparer.OrdinalIgnoreCase);
 
-    public BillingService(IOptions<StripeOptions> optionsAccessor)
+    public BillingService(
+        IOptions<StripeOptions> optionsAccessor,
+        IStripePriceLookupService priceLookupService)
     {
         _options = optionsAccessor?.Value ?? throw new ArgumentNullException(nameof(optionsAccessor));
 
@@ -27,7 +32,8 @@ public sealed class BillingService
         }
 
         StripeConfiguration.ApiKey = _options.SecretKey;
-        _priceLookup = _options.Prices.AsDictionary();
+        _configuredPrices = _options.Prices.AsDictionary();
+        _priceLookupService = priceLookupService ?? throw new ArgumentNullException(nameof(priceLookupService));
         _sessionService = new SessionService();
         _subscriptionService = new SubscriptionService();
     }
@@ -39,10 +45,7 @@ public sealed class BillingService
         string successUrl,
         string cancelUrl)
     {
-        if (!_priceLookup.TryGetValue(plan, out var priceId) || string.IsNullOrWhiteSpace(priceId))
-        {
-            throw new InvalidOperationException($"Stripe price ID is not configured for plan '{plan}'.");
-        }
+        var priceId = await ResolvePriceIdAsync(plan);
 
         var metadata = new Dictionary<string, string>
         {
@@ -120,4 +123,31 @@ public sealed class BillingService
     }
 
     public string GetPublishableKey() => _options.PublishableKey;
+
+    private async Task<string> ResolvePriceIdAsync(SubscriptionPlan plan)
+    {
+        if (!_configuredPrices.TryGetValue(plan, out var configuredValue) || string.IsNullOrWhiteSpace(configuredValue))
+        {
+            throw new InvalidOperationException($"Stripe price ID is not configured for plan '{plan}'.");
+        }
+
+        if (configuredValue.StartsWith("price_", StringComparison.OrdinalIgnoreCase))
+        {
+            return configuredValue;
+        }
+
+        if (_priceIdCache.TryGetValue(configuredValue, out var cached))
+        {
+            return cached;
+        }
+
+        var priceId = await _priceLookupService.GetPriceIdByLookupKeyAsync(configuredValue);
+        if (string.IsNullOrWhiteSpace(priceId))
+        {
+            throw new InvalidOperationException($"Stripe price lookup key '{configuredValue}' is not associated with a price.");
+        }
+
+        _priceIdCache[configuredValue] = priceId;
+        return priceId;
+    }
 }
